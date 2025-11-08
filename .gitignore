@@ -1,0 +1,35 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Package build artifacts
+*.egg-info/
+build/
+dist/
+
+# Test outputs
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Editor temporary files
+*.DS_Store
+
+# Logs
+*.log
+
+# gemsparcl output files
+*.skm
+*.skd
+*.dists
+*_clusters.csv
+*_cluster_stats.txt
+*.graphml
+*_annotations*.csv
+*_cytoscape_info.txt
+test_run_*
+test_genomes_fixed.rfile
+
+# Development files
+DEVELOPMENT_TICKET.md
+.claude

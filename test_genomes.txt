@@ -1,0 +1,10 @@
+/nfs/research/zi/projects/AllTheBacteria/Assemblies/1300k/batch_334/SAMN06242496.fa.gz
+/nfs/research/zi/projects/AllTheBacteria/Assemblies/1300k/batch_33/SAMN19159605.fa.gz
+/nfs/research/zi/projects/AllTheBacteria/Assemblies/661k/batch_002/SAMD00053101.fa.gz
+/nfs/research/zi/projects/AllTheBacteria/Assemblies/661k/batch_554/SAMN08692211.fa.gz
+/nfs/research/zi/projects/AllTheBacteria/Assemblies/1300k/batch_66/SAMN20951538.fa.gz
+/nfs/research/zi/projects/AllTheBacteria/Assemblies/661k/batch_039/SAMEA104355853.fa.gz
+/nfs/research/zi/projects/AllTheBacteria/Assemblies/1300k/batch_264/SAMN15729826.fa.gz
+/nfs/research/zi/projects/AllTheBacteria/Assemblies/1300k/batch_145/SAMN25653292.fa.gz
+/nfs/research/zi/projects/AllTheBacteria/Assemblies/1300k/batch_36/SAMN13916639.fa.gz
+/nfs/research/zi/projects/AllTheBacteria/Assemblies/1300k/batch_202/SAMN25335152.fa.gz
