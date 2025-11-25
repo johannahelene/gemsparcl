@@ -16,6 +16,7 @@ import networkx as nx
 from functools import partial
 from multiprocessing import Pool
 import itertools
+import random
 
 logger = logging.getLogger('gemsparcl.clustering')
 
@@ -150,8 +151,7 @@ def save_cluster_stats(components: List[Set], output_prefix: str) -> str:
     logger.info(f"Cluster statistics saved to {output_file}")
     return output_file
 
-
-def cluster_genomes(distance_file: str, output_prefix: str, num_processes: int,
+def cluster_genomes(distance_file: str, output_prefix: str, num_processes: int, completeness_file: str,
                    threshold: float = 0.98, chunk_size: int = 100000) -> Tuple[str, str, nx.Graph, List[Set]]:
     """Cluster genomes from distance file using network analysis."""
     logger.info(f"Starting genome clustering with threshold {threshold}")
