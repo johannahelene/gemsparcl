@@ -2,7 +2,7 @@
 """
 gemsparcl command-line interface
 
-Ultra-fast genome dereplication using advanced sketching and network clustering.
+Ultra-fast genome clustering using advanced sketching and network clustering.
 """
 
 import click
@@ -39,7 +39,7 @@ def main(verbose):
 
 @main.command()
 @click.option('-i', '--input', 'input_file', type=click.Path(exists=True),
-              help='Input rfile (tab-separated: genome_id<tab>genome_path). Required for sketching, optional with --existing-sketch')
+              help='Input rfile (tab-separated: genome_id<tab>genome_path). Required for sketching, optional with --existing-sketch or --existing-distances')
 @click.option('-o', '--output', default='gemsparcl_out',
               help='Output prefix [default: gemsparcl_out]')
 @click.option('-t', '--threshold', default=0.98, type=float,
@@ -54,6 +54,8 @@ def main(verbose):
               help='Number of nearest neighbors per genome [default: 50]')
 @click.option('--existing-sketch', type=click.Path(exists=True),
               help='Optional: Path to existing .skm file to skip sketching (expects .skd in same location)')
+@click.option('--existing-distances', type=click.Path(exists=True),
+              help='Optional: Path to existing .dists file to skip sketching and distance computation')
 @click.option('--completeness-file', type=click.Path(exists=True),
               help='Optional: File with genome completeness (tab-separated: genome_id<tab>completeness[0-1])')
 @click.option('--completeness-cutoff', default=0.64, type=float,
@@ -79,9 +81,9 @@ def main(verbose):
 
 
 def cluster(input_file, output, threshold, sketch_size, kmer_length, threads, knn,
-            existing_sketch, completeness_file, completeness_cutoff, refine,
+            existing_sketch, existing_distances, completeness_file, completeness_cutoff, refine,
             betweenness_percentile, clustering_percentile, degree_percentile,
-            cytoscape, keep_intermediates, use_inverted_index):
+            cytoscape, keep_intermediates, use_inverted_index, rep_method, rep_threshold):
     """
     Cluster genomes based on ANI similarity.
 
@@ -100,25 +102,29 @@ def cluster(input_file, output, threshold, sketch_size, kmer_length, threads, kn
 
     logger.info(f"gemsparcl v{__version__} - Starting clustering")
 
-    # Validate input: need either input_file for sketching or existing_sketch
-    if not input_file and not existing_sketch:
-        logger.error("Error: Either --input (for sketching) or --existing-sketch must be provided")
+    # Validate input: need either input_file for sketching, existing_sketch, or existing_distances
+    if not input_file and not existing_sketch and not existing_distances:
+        logger.error("Error: Either --input (for sketching), --existing-sketch, or --existing-distances must be provided")
         sys.exit(1)
 
-    if input_file and not existing_sketch:
+    if input_file and not existing_sketch and not existing_distances:
         logger.info(f"Input: {input_file}")
 
     logger.info(f"Output prefix: {output}")
     logger.info(f"ANI threshold: {threshold}")
 
-    if existing_sketch:
+    if existing_distances:
+        logger.info(f"Using existing distances file: {existing_distances}")
+        logger.info("Skipping sketching and distance computation - going straight to clustering")
+    elif existing_sketch:
         logger.info(f"Using existing sketch: {existing_sketch}")
         if not input_file:
             logger.info("Skipping sketching step - using existing sketches only")
     else:
         logger.info(f"Sketch size: {sketch_size}, K-mer length: {kmer_length}")
 
-    logger.info(f"knn: {knn}")
+    if not existing_distances:
+        logger.info(f"knn: {knn}")
 
     if completeness_file:
         logger.info(f"Completeness correction enabled: {completeness_file}")
@@ -129,13 +135,17 @@ def cluster(input_file, output, threshold, sketch_size, kmer_length, threads, kn
       sys.exit(1)
 
     try:
-        # Step 1: Run sketching and distance calculation
-        logger.info("Step 1: Running sketchlib sketching and computing distances...")
-        distances_file = sketch_and_compute_distances(
-            input_file, output, sketch_size, kmer_length, threads, knn,
-            existing_sketch, completeness_file, completeness_cutoff, keep_intermediates,
-            use_inverted_index
-        )
+        # Step 1: Run sketching and distance calculation (skip if using existing distances)
+        if existing_distances:
+            logger.info("Step 1: Using existing distances file, skipping computation")
+            distances_file = existing_distances
+        else:
+            logger.info("Step 1: Running sketchlib sketching and computing distances...")
+            distances_file = sketch_and_compute_distances(
+                input_file, output, sketch_size, kmer_length, threads, knn,
+                existing_sketch, completeness_file, completeness_cutoff, keep_intermediates,
+                use_inverted_index
+            )
         
         # Step 2: Create network and find clusters
         logger.info("Step 2: Creating similarity network and finding clusters...")
@@ -223,36 +233,36 @@ def cluster(input_file, output, threshold, sketch_size, kmer_length, threads, kn
         sys.exit(1)
 
 
-@main.command()
-@click.option('-c', '--clusters', required=True, type=click.Path(exists=True),
-              help='Cluster file from cluster command')
-@click.option('-i', '--input', 'input_file', required=True, type=click.Path(exists=True),
-              help='Original genome file list')
-@click.option('-o', '--output', default='representatives.txt',
-              help='Output representatives list [default: representatives.txt]')
-@click.option('--method', default='largest', type=click.Choice(['largest', 'random']),
-              help='Selection method [default: largest]')
-def representatives(clusters, input_file, output, method):
-    """
-    Select representative genomes from clusters.
+# @main.command()
+# @click.option('-c', '--clusters', required=True, type=click.Path(exists=True),
+#               help='Cluster file from cluster command')
+# @click.option('-i', '--input', 'input_file', required=True, type=click.Path(exists=True),
+#               help='Original genome file list')
+# @click.option('-o', '--output', default='representatives.txt',
+#               help='Output representatives list [default: representatives.txt]')
+# @click.option('--method', default='largest', type=click.Choice(['largest', 'random']),
+#               help='Selection method [default: largest]')
+# def representatives(clusters, input_file, output, method):
+#     """
+#     Select representative genomes from clusters.
     
-    This command selects one representative genome per cluster based on
-    the specified method (e.g., largest genome, random selection).
+#     This command selects one representative genome per cluster based on
+#     the specified method (e.g., largest genome, random selection).
     
-    Example:
-        gemsparcl representatives -c clusters.csv -i genomes.txt -o reps.txt
-    """
-    logger.info(f"gemsparcl v{__version__} - Selecting representatives")
-    logger.info(f"Clusters: {clusters}")
-    logger.info(f"Method: {method}")
+#     Example:
+#         gemsparcl representatives -c clusters.csv -i genomes.txt -o reps.txt
+#     """
+#     logger.info(f"gemsparcl v{__version__} - Selecting representatives")
+#     logger.info(f"Clusters: {clusters}")
+#     logger.info(f"Method: {method}")
     
-    try:
-        # TODO: Implement representative selection
-        logger.info("This feature is not yet implemented")
+#     try:
+#         # TODO: Implement representative selection
+#         logger.info("This feature is not yet implemented")
         
-    except Exception as e:
-        logger.error(f"Error selecting representatives: {e}")
-        sys.exit(1)
+#     except Exception as e:
+#         logger.error(f"Error selecting representatives: {e}")
+#         sys.exit(1)
 
 
 if __name__ == '__main__':

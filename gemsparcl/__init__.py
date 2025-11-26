@@ -1,5 +1,5 @@
 """
-gemsparcl: Ultra-fast genome dereplication using advanced sketching and network clustering
+gemsparcl: Ultra-fast genome clustering using advanced sketching and network clustering
 """
 
 __version__ = "1.0.0"
