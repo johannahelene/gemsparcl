@@ -74,10 +74,10 @@ def main(verbose):
               help='Keep sketch and distance files')
 @click.option('--use-inverted-index', is_flag=True,
               help='Use inverted index for fast search (recommended for >100k genomes)')
-@click.option('--rep-method', type=click.Choice(['fast', 'gtdb', 'dereplicate'], case_sensitive=False), default='fast',
-              help='Representative selection method [default: fast]')
-@click.option('--rep-threshold', default=0.99, type=float,
-              help='Similarity threshold for dereplicate method [default: 0.99]')
+# @click.option('--rep-method', type=click.Choice(['fast', 'gtdb', 'dereplicate'], case_sensitive=False), default='fast',
+#               help='Representative selection method [default: fast]')
+# @click.option('--rep-threshold', default=0.99, type=float,
+#               help='Similarity threshold for dereplicate method [default: 0.99]')
 
 
 def cluster(input_file, output, threshold, sketch_size, kmer_length, threads, knn,
@@ -150,7 +150,7 @@ def cluster(input_file, output, threshold, sketch_size, kmer_length, threads, kn
         # Step 2: Create network and find clusters
         logger.info("Step 2: Creating similarity network and finding clusters...")
         clusters_file, stats_file, graph, components = cluster_genomes(
-            distances_file, output, threads, completeness_file, threshold
+            distances_file, output, threads, threshold, completeness_file
         )
         
         # Load cluster assignments for optional steps
@@ -200,23 +200,23 @@ def cluster(input_file, output, threshold, sketch_size, kmer_length, threads, kn
             logger.info(f"Cytoscape files created: {len(cytoscape_files['graphml_files'])} networks")
         
         # # Step 5: Representative selection (always runs, uses final components)
-        from .representatives import select_representatives
-        logger.info(f"Selecting cluster representatives using method: {rep_method}")
-
-        reps_file = select_representatives(
-            components=components,
-            completeness_file=completeness_file,
-            output_prefix=output,
-            threads=threads,
-            method=rep_method,
-            threshold=rep_threshold  # only used if method='dereplicate'
-        )
+        # from .representatives import select_all_representatives
+        # logger.info(f"Selecting cluster representatives using method: {rep_method}")
         
-        logger.info(f"Representatives saved: {reps_file}")
+        # reps_file = select_representatives(
+        #     components=components,
+        #     completeness_file=completeness_file,
+        #     output_prefix=output,
+        #     threads=threads,
+        #     method=rep_method,
+        #     threshold=rep_threshold  # only used if method='dereplicate'
+        # )
+        
+        # logger.info(f"Representatives saved: {reps_file}")
 
 
-        # Clean up distance file if not keeping intermediates (but don't delete user-provided distances)
-        if not keep_intermediates and not existing_distances:
+        # Clean up distance file if not keeping intermediates
+        if not keep_intermediates:
             logger.info("Cleaning up intermediate distance files...")
             try:
                 os.remove(distances_file)
