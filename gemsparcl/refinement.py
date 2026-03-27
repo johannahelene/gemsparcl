@@ -15,22 +15,29 @@ def refine_network(graph: nx.Graph, components: List[Set],
                   large_component_threshold: int = 10000,
                   betweenness_percentile: float = 80.0,
                   clustering_percentile: float = 20.0,
-                  degree_percentile: float = 80.0,
-                  **kwargs) -> Tuple[nx.Graph, List[Set]]:
-    """Refine network by removing bridge edges that connect distinct clusters."""
+                  degree_percentile: float = 20.0) -> Tuple[nx.Graph, List[Set]]:
+    """Refine network by removing bridge nodes and edges that connect distinct clusters.
+
+    Contaminated genomes create artefactual bridges between distinct genomic lineages.
+    Bridge nodes are identified by high betweenness centrality (shortest paths pass
+    through them), low clustering coefficient (neighbours poorly connected to each
+    other), and low degree (few genuine similarities). These nodes are disconnected
+    and retained as singletons. Bridge edges with high betweenness are also removed.
+    """
 
     logger.info("Refining network")
 
     edges_to_remove = []
+    nodes_to_isolate = set()
 
     for component in components:
         if len(component) < 3:
             continue
 
-        subgraph = graph.subgraph(component).copy()
+        subgraph = graph.subgraph(component)
         use_approx = len(component) > large_component_threshold
 
-        # Calculate betweenness
+        # Calculate betweenness (approximate for large components)
         k = min(sample_size, len(component)) if use_approx else None
         node_betweenness = nx.betweenness_centrality(subgraph, k=k, normalized=True)
         edge_betweenness = nx.edge_betweenness_centrality(subgraph, k=k, normalized=True)
@@ -42,7 +49,17 @@ def refine_network(graph: nx.Graph, components: List[Set],
         )
         bridge_edges = _identify_bridge_edges(edge_betweenness, betweenness_percentile)
 
+        nodes_to_isolate.update(bridge_nodes)
         edges_to_remove.extend(bridge_edges)
+
+    # Remove all edges connected to bridge nodes (isolate them as singletons)
+    edges_removed_from_nodes = 0
+    for node in nodes_to_isolate:
+        if node in graph:
+            for edge in list(graph.edges(node)):
+                if graph.has_edge(*edge):
+                    graph.remove_edge(*edge)
+                    edges_removed_from_nodes += 1
 
     # Remove bridge edges
     edges_removed = 0
@@ -54,6 +71,7 @@ def refine_network(graph: nx.Graph, components: List[Set],
     # Recalculate components
     new_components = list(nx.connected_components(graph))
 
+    logger.info(f"Isolated {len(nodes_to_isolate)} bridge nodes (removed {edges_removed_from_nodes} edges)")
     logger.info(f"Removed {edges_removed} bridge edges")
     logger.info(f"Components: {len(components)} -> {len(new_components)}")
 
@@ -70,6 +88,10 @@ def _identify_bridge_nodes(subgraph: nx.Graph, node_betweenness: Dict,
 
     nodes = list(node_betweenness.keys())
     betweenness_values = np.array([node_betweenness[n] for n in nodes])
+
+    # If betweenness is uniform, no node is an outlier
+    if np.ptp(betweenness_values) == 0:
+        return []
 
     clustering_dict = nx.clustering(subgraph)
     clustering_values = np.array([clustering_dict[n] for n in nodes])
@@ -101,6 +123,10 @@ def _identify_bridge_edges(edge_betweenness: Dict, percentile: float) -> List:
 
     edges = list(edge_betweenness.keys())
     values = np.array(list(edge_betweenness.values()))
+
+    # If edge betweenness is uniform, no edge is an outlier
+    if np.ptp(values) == 0:
+        return []
 
     threshold = np.percentile(values, percentile)
     bridge_edges = [edges[i] for i, v in enumerate(values) if v >= threshold]

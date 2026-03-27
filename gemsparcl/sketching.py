@@ -109,12 +109,13 @@ def compute_distances_with_inverted(ski_file: str, skd_prefix: str, output_prefi
 
     precluster_cmd = [
         sketchlib_path, 'inverted', 'precluster',
-        ski_file,
         '--skd', skd_prefix,
         '--knn', str(knn),
         '--ani',
+        '--retain-unmatched', 'singleton',
         '--threads', str(threads),
-        '-o', distances_file
+        '-o', distances_file,
+        ski_file
     ]
 
     if completeness_file:

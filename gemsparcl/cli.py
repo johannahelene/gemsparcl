@@ -66,8 +66,8 @@ def main(verbose):
               help='Betweenness percentile threshold [default: 80.0]')
 @click.option('--clustering-percentile', default=20.0, type=float,
               help='Clustering coefficient percentile threshold [default: 20.0]')
-@click.option('--degree-percentile', default=80.0, type=float,
-              help='Degree percentile threshold [default: 80.0]')
+@click.option('--degree-percentile', default=20.0, type=float,
+              help='Degree percentile threshold [default: 20.0]')
 @click.option('--cytoscape', is_flag=True,
               help='Generate GraphML files for Cytoscape visualization')
 @click.option('--keep-intermediates', is_flag=True,
@@ -83,7 +83,7 @@ def main(verbose):
 def cluster(input_file, output, threshold, sketch_size, kmer_length, threads, knn,
             existing_sketch, existing_distances, completeness_file, completeness_cutoff, refine,
             betweenness_percentile, clustering_percentile, degree_percentile,
-            cytoscape, keep_intermediates, use_inverted_index, rep_method, rep_threshold):
+            cytoscape, keep_intermediates, use_inverted_index):
     """
     Cluster genomes based on ANI similarity.
 
@@ -150,7 +150,7 @@ def cluster(input_file, output, threshold, sketch_size, kmer_length, threads, kn
         # Step 2: Create network and find clusters
         logger.info("Step 2: Creating similarity network and finding clusters...")
         clusters_file, stats_file, graph, components = cluster_genomes(
-            distances_file, output, threads, threshold, completeness_file
+            distances_file, output, threads, completeness_file, threshold
         )
         
         # Load cluster assignments for optional steps
