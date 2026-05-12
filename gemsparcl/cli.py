@@ -8,7 +8,6 @@ Ultra-fast genome clustering using advanced sketching and network clustering.
 import click
 import logging
 import os
-from pathlib import Path
 import sys
 import traceback
 
@@ -98,7 +97,7 @@ def cluster(input_file, output, threshold, sketch_size, kmer_length, threads, kn
     """
     # Lazy import heavy dependencies
     from .sketching import sketch_and_compute_distances
-    from .clustering import cluster_genomes, process_chunk, create_graph, save_clusters_csv, save_cluster_stats
+    from .clustering import cluster_genomes, save_clusters_csv, save_cluster_stats
 
     logger.info(f"gemsparcl v{__version__} - Starting clustering")
 
@@ -175,7 +174,7 @@ def cluster(input_file, output, threshold, sketch_size, kmer_length, threads, kn
             
             # Save refined clusters
             refined_clusters_file = save_clusters_csv(refined_components, f"{output}_refined")
-            refined_stats_file = save_cluster_stats(refined_components, f"{output}_refined")
+            save_cluster_stats(refined_components, f"{output}_refined")
             
             logger.info(f"Refined clusters saved: {refined_clusters_file}")
             

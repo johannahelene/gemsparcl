@@ -3,7 +3,6 @@
 
 import logging
 import csv
-import os
 from typing import List, Set, Dict
 
 import networkx as nx

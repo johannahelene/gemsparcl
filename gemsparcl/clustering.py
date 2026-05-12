@@ -16,7 +16,6 @@ import networkx as nx
 from functools import partial
 from multiprocessing import Pool
 import itertools
-import random
 
 logger = logging.getLogger('gemsparcl.clustering')
 
