@@ -6,17 +6,64 @@ gemsparcl clusters bacterial genomes at scale using the sketchlib algorithm for 
 
 ## Installation
 
-```bash
-# Clone and install
-git clone https://github.com/yourusername/gemsparcl.git
-cd gemsparcl
-pip install -e .
+### 1. Install sketchlib
 
-# Set path to sketchlib binary
+gemsparcl requires the [sketchlib](https://github.com/bacpop/sketchlib.rust) binary. Choose the method that suits your setup:
+
+**conda (recommended):**
+```bash
+conda install -c bioconda sketchlib
+```
+No further configuration needed — sketchlib will be found automatically on your PATH.
+
+**Pre-built binary (Linux):**
+
+Download the latest binary from the [sketchlib releases page](https://github.com/bacpop/sketchlib.rust/releases), then:
+```bash
+chmod +x sketchlib
 export SKETCHLIB_PATH=/path/to/sketchlib
 ```
 
-Requires Python ≥3.8 and [sketchlib](https://github.com/bacpop/sketchlib.rust) binary.
+**Build from source (Mac M1/M2/M3/M4 or custom optimisation):**
+
+Requires the [Rust toolchain](https://rustup.rs):
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source ~/.cargo/env
+
+# Standard install:
+cargo install sketchlib
+
+# Or optimised for your machine:
+git clone https://github.com/bacpop/sketchlib.rust.git
+cd sketchlib.rust
+RUSTFLAGS="-C target-cpu=native" cargo install --path .
+
+export SKETCHLIB_PATH=$(which sketchlib)
+```
+
+> **Mac users:** If you see a message saying the binary isn't signed by Apple, run:
+> ```bash
+> xattr -d "com.apple.quarantine" ./sketchlib
+> ```
+
+Add the `export SKETCHLIB_PATH=...` line to your `~/.bashrc` or `~/.zshrc` to make it permanent.
+
+### 2. Install gemsparcl
+
+Requires Python ≥3.8.
+
+```bash
+git clone https://github.com/johannahelene/gemsparcl.git
+cd gemsparcl
+pip install .
+```
+
+### 3. Verify
+
+```bash
+gemsparcl --version
+```
 
 ## Usage
 
