@@ -65,12 +65,11 @@ def check_sketchlib() -> str:
     return sketchlib_path
 
 
-def run_sketching(input_file: str, output_prefix: str, sketch_size: int = 1000,
-                 kmer_length: int = 31, threads: int = 4) -> Tuple[str, str]:
+def run_sketching(input_file: str, output_prefix: str, sketchlib_path: str,
+                 sketch_size: int = 1000, kmer_length: int = 31,
+                 threads: int = 4) -> Tuple[str, str]:
     """Run sketchlib to create genome sketches."""
     logger.info(f"Sketching with k={kmer_length}, s={sketch_size}")
-
-    sketchlib_path = check_sketchlib()
 
     skm_file = f"{output_prefix}.skm"
     skd_file = f"{output_prefix}.skd"
@@ -94,12 +93,11 @@ def run_sketching(input_file: str, output_prefix: str, sketch_size: int = 1000,
     return skm_file, skd_file
 
 
-def run_inverted_build(input_file: str, output_prefix: str, sketch_size: int = 10,
-                      kmer_length: int = 31, threads: int = 4) -> Tuple[str, str]:
+def run_inverted_build(input_file: str, output_prefix: str, sketchlib_path: str,
+                      sketch_size: int = 10, kmer_length: int = 31,
+                      threads: int = 4) -> Tuple[str, str]:
     """Build inverted index for large-scale search."""
     logger.info(f"Building inverted index with k={kmer_length}, s={sketch_size}")
-
-    sketchlib_path = check_sketchlib()
 
     ski_file = f"{output_prefix}.ski"
     skq_file = f"{output_prefix}.skq"
@@ -125,13 +123,11 @@ def run_inverted_build(input_file: str, output_prefix: str, sketch_size: int = 1
 
 
 def compute_distances_with_inverted(ski_file: str, skd_prefix: str, output_prefix: str,
-                                   knn: int = 50, threads: int = 4,
+                                   sketchlib_path: str, knn: int = 50, threads: int = 4,
                                    completeness_file: Optional[str] = None,
                                    completeness_cutoff: float = 0.64) -> str:
     """Compute distances using inverted index."""
     logger.info(f"Computing distances with inverted index (knn={knn})")
-
-    sketchlib_path = check_sketchlib()
 
     distances_file = f"{output_prefix}.dists"
 
@@ -164,14 +160,12 @@ def compute_distances_with_inverted(ski_file: str, skd_prefix: str, output_prefi
     return distances_file
 
 
-def compute_distances(skm_file: str, output_prefix: str, kmer_length: int = 31,
-                     threads: int = 4, knn: int = 50,
+def compute_distances(skm_file: str, output_prefix: str, sketchlib_path: str,
+                     kmer_length: int = 31, threads: int = 4, knn: int = 50,
                      completeness_file: Optional[str] = None,
                      completeness_cutoff: float = 0.64) -> str:
     """Compute pairwise ANI distances."""
     logger.info(f"Computing distances (knn={knn})")
-
-    sketchlib_path = check_sketchlib()
 
     distances_file = f"{output_prefix}.dists"
 
@@ -214,6 +208,8 @@ def sketch_and_compute_distances(input_file: str, output_prefix: str,
     """Main sketching pipeline."""
     logger.info("Starting sketching pipeline")
 
+    sketchlib_path = check_sketchlib()
+
     ski_file = None
     skq_file = None
 
@@ -232,9 +228,9 @@ def sketch_and_compute_distances(input_file: str, output_prefix: str,
 
         if use_inverted_index:
             logger.info("Building inverted index with small sketch (s=10) for candidate finding")
-            ski_file, skq_file = run_inverted_build(input_file, output_prefix, 10, kmer_length, threads)
+            ski_file, skq_file = run_inverted_build(input_file, output_prefix, sketchlib_path, 10, kmer_length, threads)
 
-        skm_file, skd_file = run_sketching(input_file, output_prefix, sketch_size, kmer_length, threads)
+        skm_file, skd_file = run_sketching(input_file, output_prefix, sketchlib_path, sketch_size, kmer_length, threads)
         sketch_prefix = output_prefix
 
     logger.info("Computing distances")
@@ -246,12 +242,12 @@ def sketch_and_compute_distances(input_file: str, output_prefix: str,
                 raise FileNotFoundError(f"Index file not found: {ski_file}")
 
         distances_file = compute_distances_with_inverted(
-            ski_file, sketch_prefix, output_prefix, knn, threads,
+            ski_file, sketch_prefix, output_prefix, sketchlib_path, knn, threads,
             completeness_file, completeness_cutoff
         )
     else:
         distances_file = compute_distances(
-            skm_file, output_prefix, kmer_length, threads, knn,
+            skm_file, output_prefix, sketchlib_path, kmer_length, threads, knn,
             completeness_file, completeness_cutoff
         )
 

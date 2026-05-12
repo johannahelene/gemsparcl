@@ -48,11 +48,10 @@ def process_chunk(chunk: pd.DataFrame, edge_threshold: float, debug_enabled: boo
     filtered_out = total_edges - kept_edges
     
     # Create distance dictionary with only the filtered edges
-    # Use frozenset for genome pairs since edges are undirected
+    # Use sorted tuple for genome pairs since edges are undirected
     distance_dict = {
-        frozenset([query, ref]): ani
+        (min(query, ref), max(query, ref)): ani
         for query, ref, ani in filtered_chunk[['Query', 'Reference', 'Core']].itertuples(index=False, name=None)
-        
     }
     
     stats = {
@@ -67,8 +66,7 @@ def process_chunk(chunk: pd.DataFrame, edge_threshold: float, debug_enabled: boo
 
 
 def create_graph(genome_ids: Set[str],
-                distances: Dict[frozenset, float],
-                edge_threshold: float) -> Tuple[nx.Graph, List[Set]]:
+                distances: Dict[frozenset, float]) -> Tuple[nx.Graph, List[Set]]:
     """Create similarity network and identify connected components (clusters)."""
     logger.info("Creating similarity network from filtered distances")
     start_time = time.time()
@@ -84,13 +82,8 @@ def create_graph(genome_ids: Set[str],
     batch_size = 100000
     edge_batch = []
 
-    for pair_set, ani in distances.items():
-        pair_list = list(pair_set)
-        if len(pair_list) != 2:
-            logger.warning(f"Skipping invalid pair: {pair_set}")
-            continue
-
-        edge_batch.append((pair_list[0], pair_list[1], {'weight': ani}))
+    for (genome1, genome2), ani in distances.items():
+        edge_batch.append((genome1, genome2, {'weight': ani}))
 
         if len(edge_batch) >= batch_size:
             G.add_edges_from(edge_batch)
@@ -209,7 +202,7 @@ def cluster_genomes(distance_file: str, output_prefix: str, num_processes: int, 
         logging.debug(f"Unique genomes: {len(all_unique_genomes):,}")
     
     # Create similarity network and find clusters
-    graph, components = create_graph(all_unique_genomes, all_distances, threshold)
+    graph, components = create_graph(all_unique_genomes, all_distances)
     
     # Save results
     clusters_file = save_clusters_csv(components, output_prefix)

@@ -60,14 +60,13 @@ class TestCreateGraph:
         """Test creating a graph with two separate clusters."""
         genome_ids = {'A', 'B', 'C', 'D', 'E', 'F'}
         distances = {
-            frozenset(['A', 'B']): 0.99,
-            frozenset(['B', 'C']): 0.985,
-            frozenset(['D', 'E']): 0.995,
-            frozenset(['E', 'F']): 0.98,
+            ('A', 'B'): 0.99,
+            ('B', 'C'): 0.985,
+            ('D', 'E'): 0.995,
+            ('E', 'F'): 0.98,
         }
-        threshold = 0.98
 
-        graph, components = create_graph(genome_ids, distances, threshold)
+        graph, components = create_graph(genome_ids, distances)
 
         # Check graph properties
         assert graph.number_of_nodes() == 6
@@ -84,13 +83,12 @@ class TestCreateGraph:
         """Test graph with a singleton genome (no connections)."""
         genome_ids = {'A', 'B', 'C', 'D'}
         distances = {
-            frozenset(['A', 'B']): 0.99,
-            frozenset(['B', 'C']): 0.985,
+            ('A', 'B'): 0.99,
+            ('B', 'C'): 0.985,
             # D has no connections
         }
-        threshold = 0.98
 
-        graph, components = create_graph(genome_ids, distances, threshold)
+        graph, components = create_graph(genome_ids, distances)
 
         # Check that all genomes are in graph
         assert graph.number_of_nodes() == 4
@@ -105,13 +103,12 @@ class TestCreateGraph:
         """Test graph where all genomes form one cluster."""
         genome_ids = {'A', 'B', 'C'}
         distances = {
-            frozenset(['A', 'B']): 0.99,
-            frozenset(['B', 'C']): 0.985,
-            frozenset(['A', 'C']): 0.987,
+            ('A', 'B'): 0.99,
+            ('B', 'C'): 0.985,
+            ('A', 'C'): 0.987,
         }
-        threshold = 0.98
 
-        graph, components = create_graph(genome_ids, distances, threshold)
+        graph, components = create_graph(genome_ids, distances)
 
         # Should be 1 component with all 3 genomes
         assert len(components) == 1
