@@ -11,6 +11,34 @@ from typing import Tuple, Optional
 logger = logging.getLogger('gemsparcl.sketching')
 
 
+def validate_input_file(file_path: str) -> None:
+    """Validate the input rfile format (tab-separated: genome_id<tab>genome_path)."""
+    path = Path(file_path)
+
+    if not path.exists():
+        raise FileNotFoundError(f"Input file not found: {file_path}")
+
+    if path.stat().st_size == 0:
+        raise ValueError(f"Input file is empty: {file_path}")
+
+    valid_lines = 0
+    with open(file_path, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            parts = line.split('\t')
+            if len(parts) != 2:
+                raise ValueError(
+                    f"Input file must have 2 tab-separated columns, "
+                    f"got {len(parts)} in line: {line}"
+                )
+            valid_lines += 1
+
+    if valid_lines == 0:
+        raise ValueError(f"Input file is empty (no non-comment lines): {file_path}")
+
+
 def check_sketchlib() -> str:
     """Find and validate sketchlib binary."""
     env_path = os.environ.get('SKETCHLIB_PATH')

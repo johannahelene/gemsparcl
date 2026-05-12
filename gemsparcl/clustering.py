@@ -9,7 +9,7 @@ creating similarity networks, and identifying genome clusters.
 import logging
 import time
 import csv
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 import pandas as pd
 import networkx as nx
@@ -151,7 +151,7 @@ def save_cluster_stats(components: List[Set], output_prefix: str) -> str:
     logger.info(f"Cluster statistics saved to {output_file}")
     return output_file
 
-def cluster_genomes(distance_file: str, output_prefix: str, num_processes: int, completeness_file: str,
+def cluster_genomes(distance_file: str, output_prefix: str, num_processes: int, completeness_file: Optional[str] = None,
                    threshold: float = 0.98, chunk_size: int = 100000) -> Tuple[str, str, nx.Graph, List[Set]]:
     """Cluster genomes from distance file using network analysis."""
     logger.info(f"Starting genome clustering with threshold {threshold}")

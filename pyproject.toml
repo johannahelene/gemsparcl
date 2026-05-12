@@ -26,10 +26,22 @@ dependencies = [
 [project.scripts]
 gemsparcl = "gemsparcl.cli:main"
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+    "pytest-cov>=2.0",
+    "ruff>=0.1.0",
+]
+
 [project.urls]
 Homepage = "https://github.com/johannahelene/gemsparcl"
 Repository = "https://github.com/johannahelene/gemsparcl"
 Issues = "https://github.com/johannahelene/gemsparcl/issues"
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]
