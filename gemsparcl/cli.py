@@ -5,13 +5,68 @@ gemsparcl command-line interface
 Ultra-fast genome clustering using advanced sketching and network clustering.
 """
 
-import click
+import rich_click as click
 import logging
 import os
 import sys
 import traceback
 
 from . import __version__
+
+click.rich_click.STYLE_OPTION = "bold medium_purple1"
+click.rich_click.STYLE_SWITCH = "bold medium_purple1"
+click.rich_click.STYLE_METAVAR = "plum3"
+click.rich_click.STYLE_HELPTEXT = "white"
+click.rich_click.STYLE_OPTION_GROUP_BORDER = "medium_purple3"
+click.rich_click.STYLE_OPTION_HELP = "white"
+click.rich_click.STYLE_HEADER_TEXT = "bold medium_purple1"
+click.rich_click.STYLE_USAGE = "bold medium_purple1"
+click.rich_click.STYLE_USAGE_COMMAND = "bold white"
+
+click.rich_click.OPTION_GROUPS = {
+    "gemsparcl cluster": [
+        {
+            "name": "Input / Output",
+            "options": [
+                "--input", "--output",
+                "--existing-sketch", "--existing-distances",
+                "--keep-intermediates",
+            ],
+        },
+        {
+            "name": "Representatives",
+            "options": ["--representatives"],
+        },
+        {
+            "name": "Sketching",
+            "options": [
+                "--sketch-size", "--kmer-length", "--knn",
+                "--threads", "--use-inverted-index",
+            ],
+        },
+        {
+            "name": "Clustering",
+            "options": ["--threshold"],
+        },
+        {
+            "name": "Completeness correction (MAGs)",
+            "options": ["--completeness-file", "--completeness-cutoff"],
+        },
+        {
+            "name": "Refinement",
+            "options": [
+                "--refine",
+                "--betweenness-percentile",
+                "--clustering-percentile",
+                "--degree-percentile",
+            ],
+        },
+        {
+            "name": "Visualisation",
+            "options": ["--cytoscape"],
+        },
+    ]
+}
 
 # Configure logging
 logging.basicConfig(
@@ -73,16 +128,14 @@ def main(verbose):
               help='Keep sketch and distance files')
 @click.option('--use-inverted-index', is_flag=True,
               help='Use inverted index for fast search (recommended for >100k genomes)')
-# @click.option('--rep-method', type=click.Choice(['fast', 'gtdb', 'dereplicate'], case_sensitive=False), default='fast',
-#               help='Representative selection method [default: fast]')
-# @click.option('--rep-threshold', default=0.99, type=float,
-#               help='Similarity threshold for dereplicate method [default: 0.99]')
+@click.option('--representatives', is_flag=True,
+              help='Select one representative per cluster (highest completeness, or random)')
 
 
 def cluster(input_file, output, threshold, sketch_size, kmer_length, threads, knn,
             existing_sketch, existing_distances, completeness_file, completeness_cutoff, refine,
             betweenness_percentile, clustering_percentile, degree_percentile,
-            cytoscape, keep_intermediates, use_inverted_index):
+            cytoscape, keep_intermediates, use_inverted_index, representatives):
     """
     Cluster genomes based on ANI similarity.
 
@@ -194,21 +247,15 @@ def cluster(input_file, output, threshold, sketch_size, kmer_length, threads, kn
             )
             logger.info(f"Cytoscape files created: {len(cytoscape_files['graphml_files'])} networks")
         
-        # # Step 5: Representative selection (always runs, uses final components)
-        # from .representatives import select_all_representatives
-        # logger.info(f"Selecting cluster representatives using method: {rep_method}")
-        
-        # reps_file = select_representatives(
-        #     components=components,
-        #     completeness_file=completeness_file,
-        #     output_prefix=output,
-        #     threads=threads,
-        #     method=rep_method,
-        #     threshold=rep_threshold  # only used if method='dereplicate'
-        # )
-        
-        # logger.info(f"Representatives saved: {reps_file}")
-
+        # Step 5: Optional representative selection
+        if representatives:
+            from .representatives import select_representatives
+            logger.info("Step 5: Selecting cluster representatives...")
+            final_components = refined_components if refine else components
+            reps_file = select_representatives(
+                final_components, completeness_file, output
+            )
+            logger.info(f"Representatives saved: {reps_file}")
 
         # Clean up distance file if not keeping intermediates
         if not keep_intermediates:
@@ -226,38 +273,6 @@ def cluster(input_file, output, threshold, sketch_size, kmer_length, threads, kn
         logger.error(f"Error during clustering: {e}")
         logger.error(f"Traceback: {traceback.format_exc()}")
         sys.exit(1)
-
-
-# @main.command()
-# @click.option('-c', '--clusters', required=True, type=click.Path(exists=True),
-#               help='Cluster file from cluster command')
-# @click.option('-i', '--input', 'input_file', required=True, type=click.Path(exists=True),
-#               help='Original genome file list')
-# @click.option('-o', '--output', default='representatives.txt',
-#               help='Output representatives list [default: representatives.txt]')
-# @click.option('--method', default='largest', type=click.Choice(['largest', 'random']),
-#               help='Selection method [default: largest]')
-# def representatives(clusters, input_file, output, method):
-#     """
-#     Select representative genomes from clusters.
-    
-#     This command selects one representative genome per cluster based on
-#     the specified method (e.g., largest genome, random selection).
-    
-#     Example:
-#         gemsparcl representatives -c clusters.csv -i genomes.txt -o reps.txt
-#     """
-#     logger.info(f"gemsparcl v{__version__} - Selecting representatives")
-#     logger.info(f"Clusters: {clusters}")
-#     logger.info(f"Method: {method}")
-    
-#     try:
-#         # TODO: Implement representative selection
-#         logger.info("This feature is not yet implemented")
-        
-#     except Exception as e:
-#         logger.error(f"Error selecting representatives: {e}")
-#         sys.exit(1)
 
 
 if __name__ == '__main__':

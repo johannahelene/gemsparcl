@@ -1,10 +1,20 @@
-# gemsparcl
 
-**Fast genome clustering using sketching and network clustering**
+<table border="0">
+       <tr>
+       <td valign="middle"><h1>gemsparcl 💎✨</h1><p><strong>Rapid and consistent clustering of millions of genomes highlights the diversity of prokaryotic life
+</strong></p></td>
+       <td valign="middle" align="right"><img src="docs/logo.png" alt="gemsparcl logo" width="250"/></td>
+       </tr>
+       </table>
+
+<!-- **Fast genome clustering using sketching and network clustering** -->
 
 gemsparcl clusters bacterial genomes at scale using the sketchlib algorithm for ANI estimation and network-based clustering. It handles incomplete MAGs through completeness correction and can detect contaminated genomes through network refinement.
 
 ## Installation
+
+<details>
+<summary><b>Click to expand installation instructions</b></summary>
 
 ### 1. Install sketchlib
 
@@ -65,6 +75,8 @@ pip install .
 gemsparcl --version
 ```
 
+</details>
+
 ## Usage
 
 ```bash
@@ -101,25 +113,42 @@ genome2	0.87
 
 ### Method
 
-1. Generate sketches and compute ANI distances using sketchlib
+1. Generate sketches and compute ANI distances using sketchlib, with optional completeness correction for incomplete MAGs
 2. Build similarity network from pairwise distances above threshold
-3. Apply completeness correction for incomplete MAGs (if provided)
-4. Find connected components as genome clusters
-5. Optionally refine by removing contaminated genomes based on network topology
+3. Find connected components as genome clusters
+4. Optionally refine by removing contaminated genomes based on network topology
 
 ### Options
 
-- `--threshold FLOAT`: ANI threshold for clustering (default: 0.98)
-- `--sketch-size INT`: Sketch size (default: 1000)
-- `--kmer-length INT`: K-mer length (default: 31)
+**Input/Output:**
+- `-i, --input PATH`: Genome list file (tab-separated: genome_id\tgenome_path)
+- `-o, --output STR`: Output prefix (default: gemsparcl_out)
+- `--existing-sketch PATH`: Skip sketching, use existing `.skm` file (expects `.skd` in same location)
+- `--existing-distances PATH`: Skip sketching and distance computation, use existing `.dists` file
+- `--keep-intermediates`: Keep sketch and distance files after clustering
+
+**Sketching:**
+- `-s, --sketch-size INT`: Sketch size (default: 1000)
+- `-k, --kmer-length INT`: K-mer length (default: 31)
 - `--knn INT`: Number of nearest neighbors per genome (default: 50)
-- `--completeness-file PATH`: Genome completeness file for MAG correction
-- `--completeness-cutoff FLOAT`: Minimum completeness for correction (default: 0.64)
-- `--refine`: Enable network refinement to detect contaminated genomes
-- `--cytoscape`: Generate GraphML files for Cytoscape visualization
-- `--use-inverted-index`: Use inverted index for >100k genomes
-- `--keep-intermediates`: Keep sketch and distance files
 - `--threads INT`: Number of threads (default: 4)
+- `--use-inverted-index`: Use inverted index for fast search (recommended for >100k genomes)
+
+**Clustering:**
+- `-t, --threshold FLOAT`: ANI threshold for clustering (default: 0.98)
+
+**Completeness correction (for MAGs):**
+- `--completeness-file PATH`: Genome completeness scores (tab-separated: genome_id\tcompleteness[0-1])
+- `--completeness-cutoff FLOAT`: Minimum completeness for correction (default: 0.64)
+
+**Refinement:**
+- `--refine`: Enable network refinement to detect contaminated genomes
+- `--betweenness-percentile FLOAT`: Betweenness centrality threshold (default: 80.0)
+- `--clustering-percentile FLOAT`: Clustering coefficient threshold (default: 20.0)
+- `--degree-percentile FLOAT`: Degree threshold (default: 20.0)
+
+**Visualisation:**
+- `--cytoscape`: Generate GraphML files for Cytoscape visualization
 
 ## Citation
 

@@ -47,7 +47,7 @@ def select_representatives(components, completeness_file, output_prefix,
     else:
         raise ValueError(f"Unknown method: {method}")
 
-    # Process sequentially to avoid memory overhead from multiprocessing
+    # Process sequentially 
     logger.info(f"Processing {len(components)} components sequentially")
     all_representatives = []
     for i, component in enumerate(components):

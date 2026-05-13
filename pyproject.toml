@@ -19,6 +19,7 @@ dependencies = [
     "pandas>=2.0.0",
     "numpy>=1.24.0",
     "networkx>=3.0",
+    "rich-click>=1.6.0",
 ]
 
 [project.scripts]
