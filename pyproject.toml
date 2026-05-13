@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=77.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -10,7 +10,8 @@ authors = [
     {name = "Johanna von Wachsmann", email = "wachsmannj@ebi.ac.uk"},
 ]
 readme = "README.md"
-license = {text = "Apache-2.0"}
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.8"
 
 dependencies = [

@@ -38,18 +38,18 @@ def main(verbose):
 
 @main.command()
 @click.option('-i', '--input', 'input_file', type=click.Path(exists=True),
-              help='Input rfile (tab-separated: genome_id<tab>genome_path). Required for sketching, optional with --existing-sketch or --existing-distances')
+              help='Input file (tab-separated: genome_id<tab>genome_path). Required for sketching, optional with --existing-sketch or --existing-distances')
 @click.option('-o', '--output', default='gemsparcl_out',
               help='Output prefix [default: gemsparcl_out]')
-@click.option('-t', '--threshold', default=0.98, type=float,
+@click.option('-t', '--threshold', default=0.98, type=click.FloatRange(0.0, 1.0),
               help='ANI threshold for clustering [default: 0.98]')
-@click.option('-s', '--sketch-size', default=1000, type=int,
+@click.option('-s', '--sketch-size', default=1000, type=click.IntRange(1),
               help='Sketch size [default: 1000]')
-@click.option('-k', '--kmer-length', default=31, type=int,
+@click.option('-k', '--kmer-length', default=31, type=click.IntRange(1),
               help='K-mer length [default: 31]')
-@click.option('--threads', default=4, type=int,
+@click.option('--threads', default=4, type=click.IntRange(1),
               help='Number of threads [default: 4]')
-@click.option('--knn', default=50, type=int,
+@click.option('--knn', default=50, type=click.IntRange(1),
               help='Number of nearest neighbors per genome [default: 50]')
 @click.option('--existing-sketch', type=click.Path(exists=True),
               help='Optional: Path to existing .skm file to skip sketching (expects .skd in same location)')
@@ -57,15 +57,15 @@ def main(verbose):
               help='Optional: Path to existing .dists file to skip sketching and distance computation')
 @click.option('--completeness-file', type=click.Path(exists=True),
               help='Optional: File with genome completeness (tab-separated: genome_id<tab>completeness[0-1])')
-@click.option('--completeness-cutoff', default=0.64, type=float,
+@click.option('--completeness-cutoff', default=0.64, type=click.FloatRange(0.0, 1.0),
               help='Minimum completeness for correction [default: 0.64]')
 @click.option('--refine', is_flag=True,
               help='Enable network refinement (detect contaminated genomes)')
-@click.option('--betweenness-percentile', default=80.0, type=float,
+@click.option('--betweenness-percentile', default=80.0, type=click.FloatRange(0.0, 100.0),
               help='Betweenness percentile threshold [default: 80.0]')
-@click.option('--clustering-percentile', default=20.0, type=float,
+@click.option('--clustering-percentile', default=20.0, type=click.FloatRange(0.0, 100.0),
               help='Clustering coefficient percentile threshold [default: 20.0]')
-@click.option('--degree-percentile', default=20.0, type=float,
+@click.option('--degree-percentile', default=20.0, type=click.FloatRange(0.0, 100.0),
               help='Degree percentile threshold [default: 20.0]')
 @click.option('--cytoscape', is_flag=True,
               help='Generate GraphML files for Cytoscape visualization')
@@ -128,10 +128,6 @@ def cluster(input_file, output, threshold, sketch_size, kmer_length, threads, kn
     if completeness_file:
         logger.info(f"Completeness correction enabled: {completeness_file}")
         logger.info(f"Completeness cutoff: {completeness_cutoff}")
-
-    if threads <= 0:
-      logger.error("Number of threads must be positive")
-      sys.exit(1)
 
     try:
         # Step 1: Run sketching and distance calculation (skip if using existing distances)

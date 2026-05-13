@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Tests for gemsparcl refinement functionality."""
 
-import pytest
 import networkx as nx
 from gemsparcl.refinement import refine_network, _identify_bridge_nodes, _identify_bridge_edges
 
