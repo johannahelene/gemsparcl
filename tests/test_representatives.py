@@ -153,7 +153,7 @@ class TestSelectRepresentatives:
         output_prefix = str(tmp_dir / "test")
         _make_clusters_csv(tmp_dir / "test_clusters.csv", components)
 
-        result = select_representatives(components, None, output_prefix)
+        result = select_representatives(components, None, output_prefix, threads=1)
 
         assert Path(result).exists()
 
@@ -164,7 +164,7 @@ class TestSelectRepresentatives:
         output_prefix = str(tmp_dir / "test")
         _make_clusters_csv(tmp_dir / "test_clusters.csv", components)
 
-        result = select_representatives(components, None, output_prefix)
+        result = select_representatives(components, None, output_prefix, threads=1)
 
         with open(result) as f:
             reps = [line.strip() for line in f if line.strip()]
@@ -178,7 +178,7 @@ class TestSelectRepresentatives:
         output_prefix = str(tmp_dir / "test")
         _make_clusters_csv(tmp_dir / "test_clusters.csv", components)
 
-        select_representatives(components, None, output_prefix)
+        select_representatives(components, None, output_prefix, threads=1)
 
         df = pd.read_csv(tmp_dir / "test_clusters.csv")
         assert 'is_representative' in df.columns
@@ -190,7 +190,7 @@ class TestSelectRepresentatives:
         output_prefix = str(tmp_dir / "test")
         _make_clusters_csv(tmp_dir / "test_clusters.csv", components)
 
-        result = select_representatives(components, None, output_prefix)
+        result = select_representatives(components, None, output_prefix, threads=1)
 
         with open(result) as f:
             reps = {line.strip() for line in f if line.strip()}
@@ -206,7 +206,7 @@ class TestSelectRepresentatives:
         output_prefix = str(tmp_dir / "test")
         _make_clusters_csv(tmp_dir / "test_clusters.csv", components)
 
-        result = select_representatives(components, None, output_prefix)
+        result = select_representatives(components, None, output_prefix, threads=1)
 
         assert Path(result).exists()
 
@@ -222,7 +222,7 @@ class TestSelectRepresentatives:
         )
 
         result = select_representatives(
-            components, completeness_file, output_prefix
+            components, completeness_file, output_prefix, threads=1
         )
 
         with open(result) as f:
@@ -239,7 +239,7 @@ class TestSelectRepresentatives:
         output_prefix = str(tmp_dir / "test")
         _make_clusters_csv(tmp_dir / "test_clusters.csv", components)
 
-        result = select_representatives(components, None, output_prefix)
+        result = select_representatives(components, None, output_prefix, threads=1)
 
         with open(result) as f:
             reps = [line.strip() for line in f if line.strip()]
@@ -252,7 +252,7 @@ class TestSelectRepresentatives:
         _make_clusters_csv(tmp_dir / "test_clusters.csv", components)
 
         with pytest.raises(ValueError):
-            select_representatives(components, None, output_prefix, method='invalid')
+            select_representatives(components, None, output_prefix, threads=1, method='invalid')
 
 
 # ---------------------------------------------------------------------------
