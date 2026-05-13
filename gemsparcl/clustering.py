@@ -133,11 +133,12 @@ def save_cluster_stats(components: List[Set], output_prefix: str) -> str:
     
     cluster_sizes = [len(c) for c in components]
     total_genomes = sum(cluster_sizes)
+    largest_cluster = max(cluster_sizes) if cluster_sizes else 0
     
     with open(output_file, 'w') as f:
         f.write(f"Total clusters: {len(components)}\n")
         f.write(f"Total genomes: {total_genomes}\n")
-        f.write(f"Largest cluster: {max(cluster_sizes)} genomes\n")
+        f.write(f"Largest cluster: {largest_cluster} genomes\n")
         f.write(f"Singleton clusters: {sum(1 for size in cluster_sizes if size == 1)}\n")
     
     logger.info(f"Cluster statistics saved to {output_file}")

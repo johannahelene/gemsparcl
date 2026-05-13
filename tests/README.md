@@ -95,4 +95,4 @@ Tests are automatically run on:
 - Every pull request
 - Before releases
 
-See `.github/workflows/tests.yml` for CI configuration.
+See `.github/workflows/ci.yml` for CI configuration.

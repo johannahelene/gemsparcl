@@ -95,10 +95,6 @@ class TestSketchingIntegration:
         if small_test_data is None:
             pytest.skip("No test data available")
 
-        from gemsparcl.sketching import sketch_and_compute_distances
-
-        output_prefix = str(tmp_dir / "test_sketch")
-
         # This test would run full sketching - expensive, so we skip for now
         # In real tests, you'd have a tiny test dataset (3-5 genomes)
         pytest.skip("Full integration test - implement with tiny dataset")

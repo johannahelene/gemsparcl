@@ -1,11 +1,8 @@
 """
 Tests for clustering functionality.
 """
-import pytest
 import pandas as pd
-import networkx as nx
 from pathlib import Path
-import tempfile
 
 from gemsparcl.clustering import (
     process_chunk,
@@ -163,3 +160,16 @@ class TestSaveFunctions:
             assert "Total clusters: 3" in content
             assert "Total genomes: 6" in content
             assert "Largest cluster: 3" in content
+
+    def test_save_cluster_stats_empty_components(self, tmp_dir):
+        """Test saving cluster statistics for an empty result."""
+        output_prefix = str(tmp_dir / "empty_stats")
+
+        stats_file = save_cluster_stats([], output_prefix)
+
+        assert Path(stats_file).exists()
+        with open(stats_file) as f:
+            content = f.read()
+            assert "Total clusters: 0" in content
+            assert "Total genomes: 0" in content
+            assert "Largest cluster: 0" in content

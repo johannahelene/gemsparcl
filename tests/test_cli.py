@@ -37,17 +37,46 @@ class TestCLI:
         result = runner.invoke(main, ['cluster', '-o', 'test_out'])
         assert result.exit_code != 0
 
-    def test_cluster_invalid_threshold(self):
-        """Test cluster validates threshold range."""
+    def test_cluster_invalid_threshold(self, tmp_dir):
+        """Test cluster validates threshold range before clustering."""
+        distances_file = tmp_dir / "distances.tsv"
+        distances_file.write_text("genome_A\tgenome_B\t0.99\n")
+
         runner = CliRunner()
-        # Threshold should be between 0 and 1
         result = runner.invoke(main, [
             'cluster',
-            '-i', 'dummy.txt',
+            '--existing-distances', str(distances_file),
             '--threshold', '1.5',
         ])
-        # Should fail (either file not found or validation error)
         assert result.exit_code != 0
+        assert "threshold" in result.output.lower()
+
+    @pytest.mark.parametrize(
+        "option,value",
+        [
+            ("--completeness-cutoff", "1.5"),
+            ("--betweenness-percentile", "120"),
+            ("--clustering-percentile", "-1"),
+            ("--degree-percentile", "101"),
+            ("--knn", "0"),
+            ("--sketch-size", "0"),
+            ("--kmer-length", "0"),
+        ],
+    )
+    def test_cluster_invalid_numeric_options(self, tmp_dir, option, value):
+        """Test numeric CLI options reject invalid ranges."""
+        distances_file = tmp_dir / "distances.tsv"
+        distances_file.write_text("genome_A\tgenome_B\t0.99\n")
+
+        runner = CliRunner()
+        result = runner.invoke(main, [
+            'cluster',
+            '--existing-distances', str(distances_file),
+            option, value,
+        ])
+
+        assert result.exit_code != 0
+        assert option in result.output
 
 
 class TestCLIOptions:
