@@ -19,7 +19,7 @@ import itertools
 
 logger = logging.getLogger('gemsparcl.clustering')
 
-def process_chunk(chunk: pd.DataFrame, edge_threshold: float, debug_enabled: bool = False) -> Tuple[Set[str], Dict[frozenset, float], Dict]:
+def process_chunk(chunk: pd.DataFrame, edge_threshold: float, debug_enabled: bool = False) -> Tuple[Set[str], Dict[Tuple[str, str], float], Dict]:
     """Process a chunk of distance data and filter by threshold."""
 
     # Strip file extensions from genome IDs for cleaner output
@@ -66,7 +66,7 @@ def process_chunk(chunk: pd.DataFrame, edge_threshold: float, debug_enabled: boo
 
 
 def create_graph(genome_ids: Set[str],
-                distances: Dict[frozenset, float]) -> Tuple[nx.Graph, List[Set]]:
+                distances: Dict[Tuple[str, str], float]) -> Tuple[nx.Graph, List[Set]]:
     """Create similarity network and identify connected components (clusters)."""
     logger.info("Creating similarity network from filtered distances")
     start_time = time.time()
