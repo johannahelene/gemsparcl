@@ -150,6 +150,49 @@ genome2	0.87
 **Visualisation:**
 - `--cytoscape`: Generate GraphML files for Cytoscape visualization
 
+## Query
+
+Assign new genomes to an existing clustering without re-running the full pipeline. Sketch files and the `_config.json` from the original `cluster` run must be available.
+
+```bash
+gemsparcl query -i new_genomes.rfile -c my_clusters_config.json -o query_out
+```
+
+Sketch parameters (k-mer length, sketch size) and clustering parameters (threshold, knn) are read automatically from the config. For MAG datasets, provide a combined completeness file covering both existing and new genomes:
+
+```bash
+gemsparcl query -i new_genomes.rfile -c my_clusters_config.json \
+    --completeness-file combined_completeness.tsv -o query_out
+```
+
+**Output files:**
+
+| File | Contents |
+|---|---|
+| `query_out_query_results.csv` | New genomes only: `query_id, GCU, note, top_hit_genome, top_hit_ani` |
+| `query_out_query_full.csv` | All genomes (existing + new): `genome_id, GCU, is_query, note` |
+
+**The `note` column:**
+
+| Note | Meaning |
+|---|---|
+| `assigned` | All hits fall within one existing cluster |
+| `connecting_clusters — potential contamination` | Hits span two or more distinct non-singleton clusters |
+| `connecting_one_singleton` | Hit to exactly one singleton cluster |
+| `connecting_multiple_singletons` | Hits to two or more singleton clusters |
+| `connecting_cluster_and_singleton` | Hits to a real cluster and at least one singleton |
+| `no_hit` | No hits above the ANI threshold |
+
+**Options:**
+- `-i / --input PATH`: rfile of new genomes (required)
+- `-c / --config PATH`: `_config.json` from previous `gemsparcl cluster` run (required)
+- `-o / --output STR`: output prefix (default: `gemsparcl_query`)
+- `--completeness-file PATH`: combined completeness file for existing + new genomes
+- `--no-sketches`: delete query sketch files after the run
+- `--threads INT`: number of threads (default: 4)
+
+> **Note:** If `gemsparcl cluster` was run with `--no-sketches`, querying is not possible. Re-run clustering without that flag to enable query.
+
 ## Citation
 
 If you use gemsparcl in your research, please cite the sketchlib algorithm it depends on:

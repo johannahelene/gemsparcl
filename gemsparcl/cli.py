@@ -6,10 +6,12 @@ Ultra-fast genome clustering using advanced sketching and network clustering.
 """
 
 import rich_click as click
+import json
 import logging
 import os
 import sys
 import traceback
+from typing import Optional
 
 from . import __version__
 
@@ -30,7 +32,7 @@ click.rich_click.OPTION_GROUPS = {
             "options": [
                 "--input", "--output",
                 "--existing-sketch", "--existing-distances",
-                "--keep-intermediates",
+                "--no-sketches", "--remove-intermediates",
             ],
         },
         {
@@ -75,6 +77,25 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()]
 )
 logger = logging.getLogger('gemsparcl')
+
+
+def save_config(output: str, threshold: float, knn: int, sketch_size: int,
+                kmer_length: int, sketch_prefix: Optional[str],
+                clusters_file: str, completeness_file: Optional[str]) -> str:
+    """Write _config.json after a successful cluster run."""
+    config = {
+        "threshold": threshold,
+        "knn": knn,
+        "sketch_size": sketch_size,
+        "kmer_length": kmer_length,
+        "sketch_prefix": os.path.abspath(sketch_prefix) if sketch_prefix else None,
+        "clusters_file": os.path.abspath(clusters_file),
+        "completeness_file": os.path.abspath(completeness_file) if completeness_file else None,
+    }
+    config_file = f"{output}_config.json"
+    with open(config_file, 'w') as f:
+        json.dump(config, f, indent=2)
+    return config_file
 
 
 @click.group()
@@ -124,8 +145,10 @@ def main(verbose):
               help='Degree percentile threshold [default: 20.0]')
 @click.option('--cytoscape', is_flag=True,
               help='Generate GraphML files for Cytoscape visualization')
-@click.option('--keep-intermediates', is_flag=True,
-              help='Keep sketch and distance files')
+@click.option('--no-sketches', is_flag=True,
+              help='Delete sketch files after clustering (disables gemsparcl query on this dataset)')
+@click.option('--remove-intermediates', is_flag=True,
+              help='Remove intermediate distance files after clustering')
 @click.option('--use-inverted-index', is_flag=True,
               help='Use inverted index for fast search (recommended for >100k genomes)')
 @click.option('--representatives', is_flag=True,
@@ -135,7 +158,7 @@ def main(verbose):
 def cluster(input_file, output, threshold, sketch_size, kmer_length, threads, knn,
             existing_sketch, existing_distances, completeness_file, completeness_cutoff, refine,
             betweenness_percentile, clustering_percentile, degree_percentile,
-            cytoscape, keep_intermediates, use_inverted_index, representatives):
+            cytoscape, no_sketches, remove_intermediates, use_inverted_index, representatives):
     """
     Cluster genomes based on ANI similarity.
 
@@ -183,6 +206,20 @@ def cluster(input_file, output, threshold, sketch_size, kmer_length, threads, kn
         logger.info(f"Completeness cutoff: {completeness_cutoff}")
 
     try:
+        # Determine sketch_prefix for config (where the .skm/.skd files will live)
+        if no_sketches:
+            logger.warning(
+                "Warning: sketch files will not be kept. "
+                "You will not be able to run gemsparcl query against this dataset."
+            )
+            sketch_prefix = None
+        elif existing_sketch:
+            sketch_prefix = os.path.abspath(existing_sketch.replace('.skm', ''))
+        elif existing_distances:
+            sketch_prefix = None  # no sketch involved in this run
+        else:
+            sketch_prefix = os.path.abspath(output)
+
         # Step 1: Run sketching and distance calculation (skip if using existing distances)
         if existing_distances:
             logger.info("Step 1: Using existing distances file, skipping computation")
@@ -191,8 +228,9 @@ def cluster(input_file, output, threshold, sketch_size, kmer_length, threads, kn
             logger.info("Step 1: Running sketchlib sketching and computing distances...")
             distances_file = sketch_and_compute_distances(
                 input_file, output, sketch_size, kmer_length, threads, knn,
-                existing_sketch, completeness_file, completeness_cutoff, keep_intermediates,
-                use_inverted_index
+                existing_sketch, completeness_file, completeness_cutoff,
+                keep_sketches=not no_sketches,
+                use_inverted_index=use_inverted_index
             )
         
         # Step 2: Create network and find clusters
@@ -257,9 +295,16 @@ def cluster(input_file, output, threshold, sketch_size, kmer_length, threads, kn
             )
             logger.info(f"Representatives saved: {reps_file}")
 
-        # Clean up distance file if not keeping intermediates
-        if not keep_intermediates:
-            logger.info("Cleaning up intermediate distance files...")
+        # Write config for future gemsparcl query runs
+        config_file = save_config(
+            output, threshold, knn, sketch_size, kmer_length,
+            sketch_prefix, clusters_file, completeness_file
+        )
+        logger.info(f"Config saved: {config_file}")
+
+        # Clean up distance file if requested
+        if remove_intermediates:
+            logger.info("Removing intermediate distance files...")
             try:
                 os.remove(distances_file)
                 logger.info(f"Removed: {distances_file}")
@@ -271,6 +316,145 @@ def cluster(input_file, output, threshold, sketch_size, kmer_length, threads, kn
         
     except Exception as e:
         logger.error(f"Error during clustering: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        sys.exit(1)
+
+
+click.rich_click.OPTION_GROUPS['gemsparcl query'] = [
+    {
+        "name": "Input / Output",
+        "options": ["--input", "--config", "--output", "--no-sketches"],
+    },
+    {
+        "name": "Completeness correction (MAGs)",
+        "options": ["--completeness-file"],
+    },
+    {
+        "name": "Performance",
+        "options": ["--threads"],
+    },
+]
+
+
+@main.command()
+@click.argument('refdb')
+@click.argument('input_file', type=click.Path(exists=True))
+@click.option('-o', '--output', default='gemsparcl_query', show_default=True,
+              help='Output prefix')
+@click.option('--clusters-file', required=True, type=click.Path(exists=True),
+              help='Clusters CSV from the reference gemsparcl cluster run '
+                   '(e.g. bactdb_clusters.csv)')
+@click.option('-t', '--threshold', default=0.98, type=click.FloatRange(0.0, 1.0),
+              show_default=True, help='ANI threshold for cluster assignment')
+@click.option('--knn', default=50, type=click.IntRange(1), show_default=True,
+              help='Nearest neighbours per query genome')
+@click.option('--completeness-file', type=click.Path(exists=True),
+              help='Tab-separated completeness file (genome_id<tab>completeness)')
+@click.option('--completeness-cutoff', default=0.64, type=click.FloatRange(0.0, 1.0),
+              show_default=True)
+@click.option('--no-sketches', is_flag=True,
+              help='Delete query sketch files after the run')
+@click.option('--threads', default=4, type=click.IntRange(1), show_default=True,
+              help='Number of threads')
+def query(refdb, input_file, output, clusters_file, threshold, knn,
+          completeness_file, completeness_cutoff, no_sketches, threads):
+    """
+    Query new genomes against an existing reference database.
+
+    REFDB is the sketchlib database prefix (e.g. bactdb → bactdb.skm + bactdb.skd).
+    INPUT_FILE is a tab-separated rfile (genome_id<tab>genome_path).
+
+    Example:
+        gemsparcl query bactdb new_genomes.rfile --clusters-file bactdb_clusters.csv -o query_out
+    """
+    from .sketching import (
+        check_sketchlib, validate_input_file,
+        read_sketch_params, sketch_query_genomes, compute_query_distances,
+    )
+    from .query import (
+        load_cluster_assignments, assign_query_genomes,
+        log_contamination_warnings, save_query_results,
+    )
+    import glob
+
+    logger.info(f"gemsparcl v{__version__} - Starting query")
+
+    try:
+        # Validate refdb
+        skm_path = f"{refdb}.skm"
+        if not os.path.exists(skm_path):
+            raise FileNotFoundError(f"Reference sketch not found: {skm_path}")
+
+        validate_input_file(input_file)
+
+        # Step 1: Auto-detect sketch params from reference database
+        logger.info("Step 1: Reading sketch parameters from reference database...")
+        sketchlib_path = check_sketchlib()
+        params = read_sketch_params(refdb, sketchlib_path)
+        logger.info(f"  k={params['kmer_length']}, s={params['sketch_size']}")
+
+        # Step 2: Sketch query genomes
+        logger.info("Step 2: Sketching query genomes...")
+        query_prefix = f"{output}_query_sketches"
+        sketch_query_genomes(
+            input_file, query_prefix, sketchlib_path,
+            params['sketch_size'], params['kmer_length'], threads,
+        )
+
+        # Step 3: Compute query-vs-reference distances
+        logger.info("Step 3: Computing query distances...")
+        distances_file = compute_query_distances(
+            query_skm=f"{query_prefix}.skm",
+            reference_skm=f"{refdb}.skm",
+            output_prefix=output,
+            sketchlib_path=sketchlib_path,
+            kmer_length=params['kmer_length'],
+            knn=knn,
+            threads=threads,
+            completeness_file=completeness_file,
+            completeness_cutoff=completeness_cutoff,
+        )
+        logger.info(f"  Distances written to {distances_file}")
+
+        # Step 4: Assign query genomes to clusters
+        logger.info("Step 4: Assigning query genomes to clusters...")
+        cluster_assignments, singleton_clusters = load_cluster_assignments(clusters_file)
+        logger.info(
+            f"  Loaded {len(cluster_assignments):,} reference genomes, "
+            f"{len(singleton_clusters):,} singleton clusters"
+        )
+        assignments = assign_query_genomes(
+            distances_file, cluster_assignments, singleton_clusters, threshold
+        )
+        assigned = sum(1 for a in assignments if a['note'] == 'assigned')
+        contaminated = sum(
+            1 for a in assignments
+            if a['note'] == 'connecting_clusters — potential contamination'
+        )
+        no_hit = sum(1 for a in assignments if a['note'] == 'no_hit')
+        logger.info(
+            f"  Assigned: {assigned}, potential contamination: {contaminated}, no hit: {no_hit}"
+        )
+        log_contamination_warnings(assignments)
+
+        # Step 5: Save results
+        logger.info("Step 5: Saving results...")
+        results_file, full_file = save_query_results(assignments, clusters_file, output)
+        logger.info(f"  Results: {results_file}, {full_file}")
+
+        # Step 6: Clean up query sketch files if requested
+        if no_sketches:
+            for f in glob.glob(f"{query_prefix}.*"):
+                try:
+                    os.remove(f)
+                except OSError as e:
+                    logger.warning(f"Could not remove {f}: {e}")
+            logger.info("Query sketch files removed")
+
+        logger.info("Query completed successfully")
+
+    except Exception as e:
+        logger.error(f"Error during query: {e}")
         logger.error(f"Traceback: {traceback.format_exc()}")
         sys.exit(1)
 
