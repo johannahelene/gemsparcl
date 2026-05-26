@@ -204,7 +204,7 @@ def compute_distances(skm_file: str, output_prefix: str, sketchlib_path: str,
 
     dist_cmd = [
         sketchlib_path, 'dist',
-        skm_file,
+        skm_file.removesuffix('.skm'),
         '-o', distances_file,
         '-k', str(kmer_length),
         '--threads', str(threads),
@@ -264,11 +264,13 @@ def compute_query_distances(
 
     distances_file = f"{output_prefix}.dists"
 
+    ref_prefix = reference_skm.removesuffix('.skm')
+    query_prefix = query_skm.removesuffix('.skm')
+
     dist_cmd = [
         sketchlib_path, 'dist',
-        reference_skm,
-        query_skm,
-        '--knn', str(knn),
+        ref_prefix,
+        query_prefix,
         '-o', distances_file,
         '-k', str(kmer_length),
         '--threads', str(threads),
