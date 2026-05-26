@@ -49,11 +49,11 @@ def _write_clusters(tmp_path, rows):
 
 
 def _write_distances(tmp_path, rows):
-    """Write a distances file (no header, tab-sep) and return its path."""
+    """Write a distances file (no header, tab-sep: reference_id, query_id, ani)."""
     path = tmp_path / "distances.dists"
     with open(path, "w") as f:
         for q, r, ani in rows:
-            f.write(f"{q}\t{r}\t{ani}\n")
+            f.write(f"{r}\t{q}\t{ani}\n")
     return str(path)
 
 

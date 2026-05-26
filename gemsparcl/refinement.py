@@ -12,17 +12,22 @@ logger = logging.getLogger('gemsparcl.refinement')
 
 def refine_network(graph: nx.Graph, components: List[Set],
                   sample_size: int = 1000,
-                  large_component_threshold: int = 10000,
-                  betweenness_percentile: float = 80.0,
-                  clustering_percentile: float = 20.0,
-                  degree_percentile: float = 20.0) -> Tuple[nx.Graph, List[Set]]:
+                  large_component_threshold: int = 10000) -> Tuple[nx.Graph, List[Set]]:
     """Refine network by removing bridge nodes and edges that connect distinct clusters.
 
     Contaminated genomes create artefactual bridges between distinct genomic lineages.
-    Bridge nodes are identified by high betweenness centrality (shortest paths pass
-    through them), low clustering coefficient (neighbours poorly connected to each
-    other), and low degree (few genuine similarities). These nodes are disconnected
-    and retained as singletons. Bridge edges with high betweenness are also removed.
+
+    Step 1 — jump detection on betweenness: sort node betweenness values and find the
+    largest gap between consecutive values. Everything above that gap is a candidate.
+    If there is no meaningful jump (all values are similar), nothing is flagged.
+
+    Step 2 — sanity check on candidates: a true bridge should also have below-median
+    degree (few genuine connections to either side). Clustering is not used.
+
+    Edges are handled the same way: jump detection on edge betweenness centrality.
+
+    If a bridge edge connects two bridge nodes, an edge-only cut is tried first.
+    Full node isolation is used as a fallback only if the edge cut alone is insufficient.
     """
 
     logger.info("Refining network")
@@ -37,19 +42,31 @@ def refine_network(graph: nx.Graph, components: List[Set],
         subgraph = graph.subgraph(component)
         use_approx = len(component) > large_component_threshold
 
-        # Calculate betweenness (approximate for large components)
         k = min(sample_size, len(component)) if use_approx else None
         node_betweenness = nx.betweenness_centrality(subgraph, k=k, normalized=True)
         edge_betweenness = nx.edge_betweenness_centrality(subgraph, k=k, normalized=True)
 
-        # Identify bridge nodes and edges
-        bridge_nodes = _identify_bridge_nodes(
-            subgraph, node_betweenness,
-            betweenness_percentile, clustering_percentile, degree_percentile
-        )
-        bridge_edges = _identify_bridge_edges(edge_betweenness, betweenness_percentile)
+        bridge_nodes = _identify_bridge_nodes(subgraph, node_betweenness)
+        bridge_edges = _identify_bridge_edges(edge_betweenness)
 
-        nodes_to_isolate.update(bridge_nodes)
+        # If a bridge edge connects two bridge nodes, try cutting the edge first.
+        # Only fall back to full node isolation if the edge cut alone didn't split
+        # the component (i.e. there were multiple inter-cluster connections).
+        bridge_node_set = set(bridge_nodes)
+        resolved_nodes = set()
+        for edge in bridge_edges:
+            u, v = edge
+            if u in bridge_node_set and v in bridge_node_set:
+                test = graph.subgraph(component).copy()
+                test.remove_edge(u, v)
+                if nx.number_connected_components(test) > 1:
+                    resolved_nodes.add(u)
+                    resolved_nodes.add(v)
+                    logger.debug(f"Bridge edge between bridge nodes resolved by edge cut: {u} -- {v}")
+                else:
+                    logger.debug(f"Bridge edge between bridge nodes — edge cut insufficient, will isolate nodes: {u} -- {v}")
+
+        nodes_to_isolate.update(n for n in bridge_nodes if n not in resolved_nodes)
         edges_to_remove.extend(bridge_edges)
 
     # Remove all edges connected to bridge nodes (isolate them as singletons)
@@ -68,7 +85,6 @@ def refine_network(graph: nx.Graph, components: List[Set],
             graph.remove_edge(*edge)
             edges_removed += 1
 
-    # Recalculate components
     new_components = list(nx.connected_components(graph))
 
     logger.info(f"Isolated {len(nodes_to_isolate)} bridge nodes (removed {edges_removed_from_nodes} edges)")
@@ -78,57 +94,66 @@ def refine_network(graph: nx.Graph, components: List[Set],
     return graph, new_components
 
 
-def _identify_bridge_nodes(subgraph: nx.Graph, node_betweenness: Dict,
-                           betweenness_percentile: float,
-                           clustering_percentile: float,
-                           degree_percentile: float) -> List:
-    """Identify bridge nodes using percentile thresholds."""
+def _jump_threshold(values: np.ndarray):
+    """Return the value at the largest gap in sorted values, or None if no jump exists.
+
+    Finds the largest difference between consecutive sorted values. Everything strictly
+    above that gap position is considered an outlier. Returns None if all values are
+    identical (no gap possible).
+    """
+    sorted_vals = np.sort(values)
+    gaps = np.diff(sorted_vals)
+    if gaps.max() == 0:
+        return None
+    idx = np.argmax(gaps)
+    return sorted_vals[idx]  # threshold: flag values > this
+
+
+def _identify_bridge_nodes(subgraph: nx.Graph, node_betweenness: Dict) -> List:
+    """Identify bridge nodes via betweenness jump detection + median degree check."""
     if len(subgraph) < 3:
         return []
 
     nodes = list(node_betweenness.keys())
     betweenness_values = np.array([node_betweenness[n] for n in nodes])
 
-    # If betweenness is uniform, no node is an outlier
-    if np.ptp(betweenness_values) == 0:
+    # Step 1: find candidates via jump detection on betweenness
+    threshold = _jump_threshold(betweenness_values)
+    if threshold is None:
         return []
 
-    clustering_dict = nx.clustering(subgraph)
-    clustering_values = np.array([clustering_dict[n] for n in nodes])
+    candidate_mask = betweenness_values > threshold
+    if not candidate_mask.any():
+        return []
 
+    # Step 2: sanity check — candidates must also have below-median degree
     degrees = dict(subgraph.degree())
     max_degree = len(subgraph) - 1
     degree_values = np.array([degrees[n] / max_degree if max_degree > 0 else 0 for n in nodes])
 
-    # Calculate thresholds
-    b_thresh = np.percentile(betweenness_values, betweenness_percentile)
-    c_thresh = np.percentile(clustering_values, clustering_percentile)
-    d_thresh = np.percentile(degree_values, degree_percentile)
+    median_degree = np.median(degree_values)
 
-    # Identify bridges: high betweenness, low clustering, moderate degree
+    logger.debug(f"Betweenness jump threshold: {threshold:.6f} — {candidate_mask.sum()} candidates")
+    logger.debug(f"Median degree: {median_degree:.6f}")
+
     bridge_nodes = []
     for i, node in enumerate(nodes):
-        if (betweenness_values[i] >= b_thresh and
-            clustering_values[i] <= c_thresh and
-            degree_values[i] <= d_thresh):
+        if candidate_mask[i] and degree_values[i] <= median_degree:
             bridge_nodes.append(node)
 
     return bridge_nodes
 
 
-def _identify_bridge_edges(edge_betweenness: Dict, percentile: float) -> List:
-    """Identify bridge edges using percentile threshold."""
+def _identify_bridge_edges(edge_betweenness: Dict) -> List:
+    """Identify bridge edges via jump detection on edge betweenness."""
     if len(edge_betweenness) < 2:
         return []
 
     edges = list(edge_betweenness.keys())
     values = np.array(list(edge_betweenness.values()))
 
-    # If edge betweenness is uniform, no edge is an outlier
-    if np.ptp(values) == 0:
+    threshold = _jump_threshold(values)
+    if threshold is None:
         return []
 
-    threshold = np.percentile(values, percentile)
-    bridge_edges = [edges[i] for i, v in enumerate(values) if v >= threshold]
-
-    return bridge_edges
+    return [edges[i] for i, v in enumerate(values) if v > threshold]

@@ -37,12 +37,7 @@ class TestIdentifyBridgeNodes:
         subgraph = G.subgraph(component)
         node_betweenness = nx.betweenness_centrality(subgraph, normalized=True)
 
-        bridge_nodes = _identify_bridge_nodes(
-            subgraph, node_betweenness,
-            betweenness_percentile=80.0,
-            clustering_percentile=20.0,
-            degree_percentile=20.0
-        )
+        bridge_nodes = _identify_bridge_nodes(subgraph, node_betweenness)
 
         assert 'bridge' in bridge_nodes
 
@@ -52,12 +47,7 @@ class TestIdentifyBridgeNodes:
         subgraph = G.subgraph({'A', 'B'})
         node_betweenness = nx.betweenness_centrality(subgraph, normalized=True)
 
-        bridge_nodes = _identify_bridge_nodes(
-            subgraph, node_betweenness,
-            betweenness_percentile=80.0,
-            clustering_percentile=20.0,
-            degree_percentile=20.0
-        )
+        bridge_nodes = _identify_bridge_nodes(subgraph, node_betweenness)
 
         assert bridge_nodes == []
 
@@ -69,14 +59,14 @@ class TestIdentifyBridgeEdges:
         G = _make_two_clusters_with_bridge()
         edge_betweenness = nx.edge_betweenness_centrality(G, normalized=True)
 
-        bridge_edges = _identify_bridge_edges(edge_betweenness, percentile=80.0)
+        bridge_edges = _identify_bridge_edges(edge_betweenness)
 
         # The edges connecting bridge node to clusters should have high betweenness
         assert len(bridge_edges) >= 1
 
     def test_skips_single_edge(self):
         edge_betweenness = {('A', 'B'): 1.0}
-        bridge_edges = _identify_bridge_edges(edge_betweenness, percentile=80.0)
+        bridge_edges = _identify_bridge_edges(edge_betweenness)
         assert bridge_edges == []
 
 
@@ -136,7 +126,7 @@ class TestRefineNetwork:
 
         refined_graph, new_components = refine_network(G, components)
 
-        # A perfect clique has uniform betweenness and max clustering;
-        # no node should satisfy all three bridge criteria
+        # A perfect clique has uniform betweenness — jump detection finds no threshold
+        # and no node should be flagged
         non_singleton = [c for c in new_components if len(c) > 1]
         assert len(non_singleton) == 1
