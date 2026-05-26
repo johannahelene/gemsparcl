@@ -137,12 +137,6 @@ def main(verbose):
               help='Minimum completeness for correction [default: 0.64]')
 @click.option('--refine', is_flag=True,
               help='Enable network refinement (detect contaminated genomes)')
-@click.option('--betweenness-percentile', default=80.0, type=click.FloatRange(0.0, 100.0),
-              help='Betweenness percentile threshold [default: 80.0]')
-@click.option('--clustering-percentile', default=20.0, type=click.FloatRange(0.0, 100.0),
-              help='Clustering coefficient percentile threshold [default: 20.0]')
-@click.option('--degree-percentile', default=20.0, type=click.FloatRange(0.0, 100.0),
-              help='Degree percentile threshold [default: 20.0]')
 @click.option('--cytoscape', is_flag=True,
               help='Generate GraphML files for Cytoscape visualization')
 @click.option('--no-sketches', is_flag=True,
@@ -157,7 +151,6 @@ def main(verbose):
 
 def cluster(input_file, output, threshold, sketch_size, kmer_length, threads, knn,
             existing_sketch, existing_distances, completeness_file, completeness_cutoff, refine,
-            betweenness_percentile, clustering_percentile, degree_percentile,
             cytoscape, no_sketches, remove_intermediates, use_inverted_index, representatives):
     """
     Cluster genomes based on ANI similarity.
@@ -252,12 +245,7 @@ def cluster(input_file, output, threshold, sketch_size, kmer_length, threads, kn
             logger.info("Step 3: Refining clusters (removing contaminated genomes)...")
 
             # Apply refinement directly to the existing graph
-            refined_graph, refined_components = refine_network(
-                graph, components,
-                betweenness_percentile=betweenness_percentile,
-                clustering_percentile=clustering_percentile,
-                degree_percentile=degree_percentile
-            )
+            refined_graph, refined_components = refine_network(graph, components)
             
             # Save refined clusters
             refined_clusters_file = save_clusters_csv(refined_components, f"{output}_refined")

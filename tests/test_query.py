@@ -1,10 +1,8 @@
 """Tests for gemsparcl/query.py"""
 
 import json
-import os
 import pytest
 import pandas as pd
-import tempfile
 
 from gemsparcl.query import (
     load_config,
@@ -49,11 +47,11 @@ def _write_clusters(tmp_path, rows):
 
 
 def _write_distances(tmp_path, rows):
-    """Write a distances file (no header, tab-sep) and return its path."""
+    """Write a distances file (no header, tab-sep: reference_id, query_id, ani)."""
     path = tmp_path / "distances.dists"
     with open(path, "w") as f:
         for q, r, ani in rows:
-            f.write(f"{q}\t{r}\t{ani}\n")
+            f.write(f"{r}\t{q}\t{ani}\n")
     return str(path)
 
 
@@ -293,5 +291,5 @@ class TestSaveQueryResults:
         clusters = _write_clusters(tmp_path, [("ref_A", 1)])
         save_query_results(self._assignments(), clusters, str(tmp_path / "out"))
         df = pd.read_csv(tmp_path / "out_query_full.csv")
-        assert df.loc[df["genome_id"] == "ref_A", "is_query"].values[0] == False
-        assert df.loc[df["genome_id"] == "new_A", "is_query"].values[0] == True
+        assert not df.loc[df["genome_id"] == "ref_A", "is_query"].values[0]
+        assert df.loc[df["genome_id"] == "new_A", "is_query"].values[0]
