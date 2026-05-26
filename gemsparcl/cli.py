@@ -63,10 +63,6 @@ click.rich_click.OPTION_GROUPS = {
                 "--degree-percentile",
             ],
         },
-        {
-            "name": "Visualisation",
-            "options": ["--cytoscape"],
-        },
     ]
 }
 
@@ -137,8 +133,6 @@ def main(verbose):
               help='Minimum completeness for correction [default: 0.64]')
 @click.option('--refine', is_flag=True,
               help='Enable network refinement (detect contaminated genomes)')
-@click.option('--cytoscape', is_flag=True,
-              help='Generate GraphML files for Cytoscape visualization')
 @click.option('--no-sketches', is_flag=True,
               help='Delete sketch files after clustering (disables gemsparcl query on this dataset)')
 @click.option('--remove-intermediates', is_flag=True,
@@ -151,7 +145,7 @@ def main(verbose):
 
 def cluster(input_file, output, threshold, sketch_size, kmer_length, threads, knn,
             existing_sketch, existing_distances, completeness_file, completeness_cutoff, refine,
-            cytoscape, no_sketches, remove_intermediates, use_inverted_index, representatives):
+            no_sketches, remove_intermediates, use_inverted_index, representatives):
     """
     Cluster genomes based on ANI similarity.
 
@@ -232,13 +226,6 @@ def cluster(input_file, output, threshold, sketch_size, kmer_length, threads, kn
             distances_file, output, threads, completeness_file, threshold
         )
         
-        # Load cluster assignments for optional steps
-        cluster_assignments = {}
-        if refine or cytoscape:
-            import pandas as pd
-            cluster_df = pd.read_csv(clusters_file)
-            cluster_assignments = dict(zip(cluster_df['genome_id'], cluster_df['cluster']))
-        
         # Step 3: Optional refinement
         if refine:
             from .refinement import refine_network
@@ -253,30 +240,10 @@ def cluster(input_file, output, threshold, sketch_size, kmer_length, threads, kn
             
             logger.info(f"Refined clusters saved: {refined_clusters_file}")
             
-            # Update for cytoscape if needed
-            if cytoscape:
-                graph = refined_graph
-                components = refined_components
-                # Update cluster assignments
-                cluster_df = pd.read_csv(refined_clusters_file)
-                cluster_assignments = dict(zip(cluster_df['genome_id'], cluster_df['cluster']))
-        
-        # Step 4: Optional Cytoscape output
-        if cytoscape:
-            from .cytoscape import export_network_for_cytoscape
-            logger.info("Step 4: Generating Cytoscape files...")
-
-            # Export to Cytoscape using the graph we already have
-            # (either the original from clustering or the refined version)
-            cytoscape_files = export_network_for_cytoscape(
-                graph, components, output, cluster_assignments
-            )
-            logger.info(f"Cytoscape files created: {len(cytoscape_files['graphml_files'])} networks")
-        
-        # Step 5: Optional representative selection
+        # Step 4: Optional representative selection
         if representatives:
             from .representatives import select_representatives
-            logger.info("Step 5: Selecting cluster representatives...")
+            logger.info("Step 4: Selecting cluster representatives...")
             final_components = refined_components if refine else components
             reps_file = select_representatives(
                 final_components, completeness_file, output
@@ -443,6 +410,52 @@ def query(refdb, input_file, output, clusters_file, threshold, knn,
 
     except Exception as e:
         logger.error(f"Error during query: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        sys.exit(1)
+
+
+@main.command()
+@click.option('--existing-distances', required=True, type=click.Path(exists=True),
+              help='Path to existing .dists file')
+@click.option('--clusters-file', required=True, type=click.Path(exists=True),
+              help='Clusters CSV from a gemsparcl cluster run (used for node annotations)')
+@click.option('-t', '--threshold', default=0.98, type=click.FloatRange(0.0, 1.0),
+              show_default=True, help='ANI threshold used to rebuild the network')
+@click.option('-o', '--output', default='gemsparcl_vis', show_default=True,
+              help='Output prefix for GraphML and annotation files')
+@click.option('--threads', default=4, type=click.IntRange(1), show_default=True,
+              help='Number of threads for distance processing')
+def visualise(existing_distances, clusters_file, threshold, output, threads):
+    """Export the similarity network to Cytoscape-compatible GraphML files.
+
+    Rebuilds the network from an existing distances file and exports it as GraphML,
+    ready to open in Cytoscape. Large networks are split into multiple files.
+
+    Example:
+        gemsparcl visualise --existing-distances my_run.dists --clusters-file my_run_clusters.csv -o vis_out
+    """
+    from .clustering import build_graph_from_distances
+    from .cytoscape import export_network_for_cytoscape
+    import pandas as pd
+
+    logger.info(f"gemsparcl v{__version__} - Starting visualisation")
+
+    try:
+        logger.info(f"Building network from {existing_distances} (threshold={threshold})...")
+        graph, components = build_graph_from_distances(existing_distances, threshold, threads)
+        logger.info(f"Network: {graph.number_of_nodes()} nodes, {graph.number_of_edges()} edges, "
+                    f"{len(components)} components")
+
+        cluster_df = pd.read_csv(clusters_file)
+        cluster_assignments = dict(zip(cluster_df['genome_id'], cluster_df['cluster']))
+
+        logger.info("Exporting to Cytoscape GraphML...")
+        result = export_network_for_cytoscape(graph, components, output, cluster_assignments)
+        logger.info(f"Created {len(result['graphml_files'])} GraphML file(s): "
+                    + ', '.join(result['graphml_files']))
+
+    except Exception as e:
+        logger.error(f"Error during visualisation: {e}")
         logger.error(f"Traceback: {traceback.format_exc()}")
         sys.exit(1)
 

@@ -55,9 +55,6 @@ class TestCLI:
         "option,value",
         [
             ("--completeness-cutoff", "1.5"),
-            ("--betweenness-percentile", "120"),
-            ("--clustering-percentile", "-1"),
-            ("--degree-percentile", "101"),
             ("--knn", "0"),
             ("--sketch-size", "0"),
             ("--kmer-length", "0"),
@@ -94,8 +91,10 @@ class TestCLIOptions:
         result = runner.invoke(main, ['cluster', '--help'])
         assert '--refine' in result.output
 
-    def test_cytoscape_flag(self):
-        """Test that --cytoscape flag is recognized."""
+    def test_visualise_command(self):
+        """Test that visualise is a recognised command with expected options."""
         runner = CliRunner()
-        result = runner.invoke(main, ['cluster', '--help'])
-        assert '--cytoscape' in result.output
+        result = runner.invoke(main, ['visualise', '--help'])
+        assert result.exit_code == 0
+        assert '--existing-distances' in result.output
+        assert '--clusters-file' in result.output

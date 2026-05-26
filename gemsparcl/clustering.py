@@ -144,6 +144,38 @@ def save_cluster_stats(components: List[Set], output_prefix: str) -> str:
     logger.info(f"Cluster statistics saved to {output_file}")
     return output_file
 
+def build_graph_from_distances(distance_file: str, threshold: float = 0.98,
+                               num_processes: int = 4,
+                               chunk_size: int = 100_000) -> Tuple[nx.Graph, List[Set]]:
+    """Build similarity network from a distances file without saving any output files.
+
+    Reuses process_chunk and create_graph. Use this when you need the graph object
+    only (e.g. for visualisation) without re-running the full clustering pipeline.
+    Returns (graph, components).
+    """
+    all_unique_genomes: Set[str] = set()
+    all_distances: Dict[Tuple[str, str], float] = {}
+
+    chunk_iterator = pd.read_csv(
+        distance_file, sep='\t', chunksize=chunk_size,
+        names=['Query', 'Reference', 'Core'], header=None,
+    )
+
+    debug_enabled = logging.getLogger().isEnabledFor(logging.DEBUG)
+    process_func = partial(process_chunk, edge_threshold=threshold, debug_enabled=debug_enabled)
+
+    with Pool(num_processes) as pool:
+        while True:
+            batch = list(itertools.islice(chunk_iterator, num_processes * 2))
+            if not batch:
+                break
+            for chunk_genomes, chunk_distances, _ in pool.map(process_func, batch):
+                all_unique_genomes.update(chunk_genomes)
+                all_distances.update(chunk_distances)
+
+    return create_graph(all_unique_genomes, all_distances)
+
+
 def cluster_genomes(distance_file: str, output_prefix: str, num_processes: int, completeness_file: Optional[str] = None,
                    threshold: float = 0.98, chunk_size: int = 100000) -> Tuple[str, str, nx.Graph, List[Set]]:
     """Cluster genomes from distance file using network analysis."""
