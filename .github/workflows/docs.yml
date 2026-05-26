@@ -32,7 +32,7 @@ jobs:
       - name: Build docs
         run: python -m sphinx docs/source docs/build/html -b html
 
-      - uses: actions/upload-pages-artifact@v5
+      - uses: actions/upload-pages-artifact@v4
         with:
           path: docs/build/html
 
