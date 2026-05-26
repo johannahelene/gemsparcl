@@ -1,10 +1,8 @@
 """Tests for gemsparcl/query.py"""
 
 import json
-import os
 import pytest
 import pandas as pd
-import tempfile
 
 from gemsparcl.query import (
     load_config,
@@ -293,5 +291,5 @@ class TestSaveQueryResults:
         clusters = _write_clusters(tmp_path, [("ref_A", 1)])
         save_query_results(self._assignments(), clusters, str(tmp_path / "out"))
         df = pd.read_csv(tmp_path / "out_query_full.csv")
-        assert df.loc[df["genome_id"] == "ref_A", "is_query"].values[0] == False
-        assert df.loc[df["genome_id"] == "new_A", "is_query"].values[0] == True
+        assert not df.loc[df["genome_id"] == "ref_A", "is_query"].values[0]
+        assert df.loc[df["genome_id"] == "new_A", "is_query"].values[0]
