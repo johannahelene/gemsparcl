@@ -65,6 +65,39 @@ def check_sketchlib() -> str:
     return sketchlib_path
 
 
+def read_sketch_params(ref_db_prefix: str, sketchlib_path: str) -> dict:
+    """Parse k-mer length and sketch size from `sketchlib info {ref_db_prefix}.skm`.
+
+    Raises ValueError if the database has more than one k value, since gemsparcl
+    only supports single-k queries.
+    """
+    result = subprocess.run(
+        [sketchlib_path, 'info', f"{ref_db_prefix}.skm"],
+        capture_output=True, text=True, check=True
+    )
+    kmer_length = None
+    sketch_size = None
+    for line in result.stdout.splitlines():
+        if line.startswith('kmers='):
+            inner = line.split('=', 1)[1].strip('[]')
+            vals = [int(x.strip()) for x in inner.split(',')]
+            if len(vals) > 1:
+                raise ValueError(
+                    f"Reference database has multiple k values {vals}. "
+                    "gemsparcl query only supports single-k databases. "
+                    "Re-sketch with a single --k-vals value."
+                )
+            kmer_length = vals[0]
+        elif line.startswith('sketch_size='):
+            sketch_size = int(line.split('=', 1)[1])
+    if kmer_length is None or sketch_size is None:
+        raise ValueError(
+            f"Could not parse k/s from sketchlib info output:\n{result.stdout}"
+        )
+    logger.info(f"Read from reference: k={kmer_length}, sketch_size={sketch_size}")
+    return {'kmer_length': kmer_length, 'sketch_size': sketch_size}
+
+
 def run_sketching(input_file: str, output_prefix: str, sketchlib_path: str,
                  sketch_size: int = 1000, kmer_length: int = 31,
                  threads: int = 4) -> Tuple[str, str]:
@@ -171,7 +204,7 @@ def compute_distances(skm_file: str, output_prefix: str, sketchlib_path: str,
 
     dist_cmd = [
         sketchlib_path, 'dist',
-        skm_file,
+        skm_file.removesuffix('.skm'),
         '-o', distances_file,
         '-k', str(kmer_length),
         '--threads', str(threads),
@@ -197,13 +230,78 @@ def compute_distances(skm_file: str, output_prefix: str, sketchlib_path: str,
     return distances_file
 
 
+def sketch_query_genomes(
+    query_file: str,
+    output_prefix: str,
+    sketchlib_path: str,
+    sketch_size: int,
+    kmer_length: int,
+    threads: int = 4,
+) -> Tuple[str, str]:
+    """Sketch query genomes using the same parameters as the reference database."""
+    return run_sketching(
+        query_file, output_prefix, sketchlib_path, sketch_size, kmer_length, threads
+    )
+
+
+def compute_query_distances(
+    query_skm: str,
+    reference_skm: str,
+    output_prefix: str,
+    sketchlib_path: str,
+    kmer_length: int,
+    knn: int,
+    threads: int = 4,
+    completeness_file: Optional[str] = None,
+    completeness_cutoff: float = 0.64,
+) -> str:
+    """Compute distances between query genomes and the reference database.
+
+    Uses sketchlib dist with query as second argument so only query-vs-reference
+    distances are computed, not all-vs-all.
+    """
+    logger.info(f"Computing query distances (knn={knn})")
+
+    distances_file = f"{output_prefix}.dists"
+
+    ref_prefix = reference_skm.removesuffix('.skm')
+    query_prefix = query_skm.removesuffix('.skm')
+
+    dist_cmd = [
+        sketchlib_path, 'dist',
+        ref_prefix,
+        query_prefix,
+        '-o', distances_file,
+        '-k', str(kmer_length),
+        '--threads', str(threads),
+        '--ani',
+    ]
+
+    if completeness_file:
+        dist_cmd.extend([
+            '--completeness-file', completeness_file,
+            '--completeness-cutoff', str(completeness_cutoff),
+        ])
+
+    logger.info(f"Running: {' '.join(dist_cmd)}")
+    subprocess.run(dist_cmd, check=True)
+
+    if not Path(distances_file).exists():
+        raise FileNotFoundError("Query distance file not created")
+
+    size_mb = Path(distances_file).stat().st_size / (1024 * 1024)
+    logger.info(f"Created: {distances_file} ({size_mb:.1f} MB)")
+
+    return distances_file
+
+
 def sketch_and_compute_distances(input_file: str, output_prefix: str,
                                 sketch_size: int = 1000, kmer_length: int = 31,
                                 threads: int = 4, knn: int = 50,
                                 existing_sketch: Optional[str] = None,
                                 completeness_file: Optional[str] = None,
                                 completeness_cutoff: float = 0.64,
-                                keep_intermediates: bool = False,
+                                keep_sketches: bool = True,
                                 use_inverted_index: bool = False) -> str:
     """Main sketching pipeline."""
     logger.info("Starting sketching pipeline")
@@ -221,7 +319,7 @@ def sketch_and_compute_distances(input_file: str, output_prefix: str,
         if not Path(skd_file).exists():
             raise FileNotFoundError(f".skd file not found: {skd_file}")
 
-        keep_intermediates = True
+        keep_sketches = True  # never delete user-provided sketches
         sketch_prefix = skm_file.replace('.skm', '')
     else:
         logger.info(f"Creating sketches from: {input_file}")
@@ -251,8 +349,8 @@ def sketch_and_compute_distances(input_file: str, output_prefix: str,
             completeness_file, completeness_cutoff
         )
 
-    if not keep_intermediates:
-        logger.info("Cleaning up intermediate files")
+    if not keep_sketches:
+        logger.info("Removing sketch files")
         files_to_remove = [skm_file, skd_file]
         if ski_file:
             files_to_remove.extend([ski_file, skq_file])
