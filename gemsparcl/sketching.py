@@ -98,6 +98,36 @@ def read_sketch_params(ref_db_prefix: str, sketchlib_path: str) -> dict:
     return {'kmer_length': kmer_length, 'sketch_size': sketch_size}
 
 
+def validate_sketch_compatibility(ref_db_prefix: str, query_db_prefix: str,
+                                  sketchlib_path: str) -> None:
+    """Raise ValueError if reference and query sketch databases are incompatible.
+
+    Checks k-mer length and sketch size match exactly. Must be called before
+    compute_query_distances to prevent silent wrong results.
+    """
+    ref_params = read_sketch_params(ref_db_prefix, sketchlib_path)
+    query_params = read_sketch_params(query_db_prefix, sketchlib_path)
+
+    errors = []
+    if ref_params['kmer_length'] != query_params['kmer_length']:
+        errors.append(
+            f"k-mer length mismatch: reference k={ref_params['kmer_length']}, "
+            f"query k={query_params['kmer_length']}"
+        )
+    if ref_params['sketch_size'] != query_params['sketch_size']:
+        errors.append(
+            f"sketch size mismatch: reference s={ref_params['sketch_size']}, "
+            f"query s={query_params['sketch_size']}"
+        )
+    if errors:
+        raise ValueError(
+            "Reference and query sketch databases are incompatible:\n" +
+            "\n".join(f"  - {e}" for e in errors) +
+            "\nRe-sketch the query with the same parameters as the reference."
+        )
+    logger.info("Sketch compatibility check passed")
+
+
 def run_sketching(input_file: str, output_prefix: str, sketchlib_path: str,
                  sketch_size: int = 1000, kmer_length: int = 31,
                  threads: int = 4) -> Tuple[str, str]:
@@ -214,7 +244,7 @@ def compute_distances(skm_file: str, output_prefix: str, sketchlib_path: str,
 
     if completeness_file:
         dist_cmd.extend([
-            '--completeness-file', completeness_file,
+            '--ref-completeness-file', completeness_file,
             '--completeness-cutoff', str(completeness_cutoff)
         ])
 
@@ -245,14 +275,15 @@ def sketch_query_genomes(
 
 
 def compute_query_distances(
-    query_skm: str,
     reference_skm: str,
+    query_skm: str,
     output_prefix: str,
     sketchlib_path: str,
     kmer_length: int,
     knn: int,
     threads: int = 4,
-    completeness_file: Optional[str] = None,
+    ref_completeness_file: Optional[str] = None,
+    query_completeness_file: Optional[str] = None,
     completeness_cutoff: float = 0.64,
 ) -> str:
     """Compute distances between query genomes and the reference database.
@@ -275,12 +306,17 @@ def compute_query_distances(
         '-k', str(kmer_length),
         '--threads', str(threads),
         '--ani',
+        '--knn', str(knn),
     ]
 
-    if completeness_file:
+    if ref_completeness_file:
         dist_cmd.extend([
-            '--completeness-file', completeness_file,
+            '--ref-completeness-file', ref_completeness_file,
             '--completeness-cutoff', str(completeness_cutoff),
+        ])
+    if query_completeness_file:
+        dist_cmd.extend([
+            '--query-completeness-file', query_completeness_file,
         ])
 
     logger.info(f"Running: {' '.join(dist_cmd)}")

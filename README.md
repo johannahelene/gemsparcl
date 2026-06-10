@@ -1,14 +1,8 @@
-<table border="0">
-  <tr>
-    <td valign="middle">
-      <h1>gemsparcl</h1>
-      <p>Fast, scalable genome clustering using sketch-based ANI and network analysis.</p>
-    </td>
-    <td valign="middle" align="right">
-      <img src="docs/logo.png" alt="gemsparcl logo" width="200"/>
-    </td>
-  </tr>
-</table>
+<img src="docs/logo.png" alt="gemsparcl logo" width="200"/>
+
+# gemsparcl
+
+Fast, scalable genome clustering using sketch-based ANI and network analysis.
 
 **Documentation:** https://johannahelene.github.io/gemsparcl/
 
@@ -37,8 +31,7 @@ Full documentation at https://johannahelene.github.io/gemsparcl/
 
 If you use gemsparcl, please cite:
 
-- Zhao, X. BinDash, software for fast genome distance estimation. *Bioinformatics* **35**:671–673 (2019)
-- sketchlib: https://github.com/bacpop/sketchlib.rust
+- von Wachsmann, J., Lorenz, L., Russell, M., Gurbich, T., Rodriguez-Bouza, V., Horsfield, S., Lees, J. A., & Finn, R. D. Rapid and Consistent Genome Clustering at the Scale of Millions of MAGs and Isolates. *bioRxiv* (2025). https://doi.org/10.64898/2025.12.30.695181
 
 ## License
 

@@ -278,11 +278,11 @@ def cluster(input_file, output, threshold, sketch_size, kmer_length, threads, kn
 click.rich_click.OPTION_GROUPS['gemsparcl query'] = [
     {
         "name": "Input / Output",
-        "options": ["--input", "--config", "--output", "--no-sketches"],
+        "options": ["--input", "--config", "--output", "--existing-query-sketch", "--no-sketches"],
     },
     {
         "name": "Completeness correction (MAGs)",
-        "options": ["--completeness-file"],
+        "options": ["--ref-completeness-file", "--query-completeness-file", "--completeness-cutoff"],
     },
     {
         "name": "Performance",
@@ -303,16 +303,23 @@ click.rich_click.OPTION_GROUPS['gemsparcl query'] = [
               show_default=True, help='ANI threshold for cluster assignment')
 @click.option('--knn', default=50, type=click.IntRange(1), show_default=True,
               help='Nearest neighbours per query genome')
-@click.option('--completeness-file', type=click.Path(exists=True),
-              help='Tab-separated completeness file (genome_id<tab>completeness)')
+@click.option('--existing-query-sketch', type=click.Path(exists=True),
+              help='Path to an existing query .skm file to skip re-sketching '
+                   '(expects .skd in the same location). Compatibility with '
+                   'the reference database is always validated.')
+@click.option('--ref-completeness-file', type=click.Path(exists=True),
+              help='Tab-separated completeness file for the reference database genomes (genome_id<tab>completeness)')
+@click.option('--query-completeness-file', type=click.Path(exists=True),
+              help='Tab-separated completeness file for the query genomes (genome_id<tab>completeness)')
 @click.option('--completeness-cutoff', default=0.64, type=click.FloatRange(0.0, 1.0),
               show_default=True)
 @click.option('--no-sketches', is_flag=True,
-              help='Delete query sketch files after the run')
+              help='Delete query sketch files after the run (ignored if --existing-query-sketch is used)')
 @click.option('--threads', default=4, type=click.IntRange(1), show_default=True,
               help='Number of threads')
 def query(refdb, input_file, output, clusters_file, threshold, knn,
-          completeness_file, completeness_cutoff, no_sketches, threads):
+          existing_query_sketch, ref_completeness_file, query_completeness_file,
+          completeness_cutoff, no_sketches, threads):
     """
     Query new genomes against an existing reference database.
 
@@ -325,6 +332,7 @@ def query(refdb, input_file, output, clusters_file, threshold, knn,
     from .sketching import (
         check_sketchlib, validate_input_file,
         read_sketch_params, sketch_query_genomes, compute_query_distances,
+        validate_sketch_compatibility,
     )
     from .query import (
         load_cluster_assignments, assign_query_genomes,
@@ -348,25 +356,41 @@ def query(refdb, input_file, output, clusters_file, threshold, knn,
         params = read_sketch_params(refdb, sketchlib_path)
         logger.info(f"  k={params['kmer_length']}, s={params['sketch_size']}")
 
-        # Step 2: Sketch query genomes
-        logger.info("Step 2: Sketching query genomes...")
-        query_prefix = f"{output}_query_sketches"
-        sketch_query_genomes(
-            input_file, query_prefix, sketchlib_path,
-            params['sketch_size'], params['kmer_length'], threads,
-        )
+        # Step 2: Sketch query genomes (or use existing sketch)
+        if existing_query_sketch:
+            query_prefix = existing_query_sketch.removesuffix('.skm').removesuffix('.skd')
+            logger.info(f"Step 2: Using existing query sketch: {query_prefix}")
+            skd_path = f"{query_prefix}.skd"
+            if not os.path.exists(skd_path):
+                raise FileNotFoundError(
+                    f"Expected .skd file not found alongside existing sketch: {skd_path}"
+                )
+            sketches_owned = False
+        else:
+            logger.info("Step 2: Sketching query genomes...")
+            query_prefix = f"{output}_query_sketches"
+            sketch_query_genomes(
+                input_file, query_prefix, sketchlib_path,
+                params['sketch_size'], params['kmer_length'], threads,
+            )
+            sketches_owned = True
+
+        # Always validate that ref and query sketches are compatible
+        logger.info("Step 2b: Validating sketch compatibility...")
+        validate_sketch_compatibility(refdb, query_prefix, sketchlib_path)
 
         # Step 3: Compute query-vs-reference distances
         logger.info("Step 3: Computing query distances...")
         distances_file = compute_query_distances(
-            query_skm=f"{query_prefix}.skm",
             reference_skm=f"{refdb}.skm",
+            query_skm=f"{query_prefix}.skm",
             output_prefix=output,
             sketchlib_path=sketchlib_path,
             kmer_length=params['kmer_length'],
             knn=knn,
             threads=threads,
-            completeness_file=completeness_file,
+            ref_completeness_file=ref_completeness_file,
+            query_completeness_file=query_completeness_file,
             completeness_cutoff=completeness_cutoff,
         )
         logger.info(f"  Distances written to {distances_file}")
@@ -397,14 +421,16 @@ def query(refdb, input_file, output, clusters_file, threshold, knn,
         results_file, full_file = save_query_results(assignments, clusters_file, output)
         logger.info(f"  Results: {results_file}, {full_file}")
 
-        # Step 6: Clean up query sketch files if requested
-        if no_sketches:
+        # Step 6: Clean up query sketch files if requested (never delete user-provided sketches)
+        if no_sketches and sketches_owned:
             for f in glob.glob(f"{query_prefix}.*"):
                 try:
                     os.remove(f)
                 except OSError as e:
                     logger.warning(f"Could not remove {f}: {e}")
             logger.info("Query sketch files removed")
+        elif no_sketches and not sketches_owned:
+            logger.info("--no-sketches ignored: will not delete user-provided sketch files")
 
         logger.info("Query completed successfully")
 

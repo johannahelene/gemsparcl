@@ -84,9 +84,9 @@ def assign_query_genomes(
 
     for chunk in pd.read_csv(
         distances_file, sep='\t', header=None,
-        names=['reference_id', 'query_id', 'ani'],
+        names=['query_id', 'reference_id', 'ani'],
         chunksize=100_000,
-        dtype={'reference_id': str, 'query_id': str, 'ani': float},
+        dtype={'query_id': str, 'reference_id': str, 'ani': float},
     ):
         all_query_ids.update(chunk['query_id'].unique())
 
