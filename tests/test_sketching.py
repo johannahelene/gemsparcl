@@ -8,6 +8,7 @@ import shutil
 from gemsparcl.sketching import (
     check_sketchlib,
     validate_input_file,
+    normalize_genome_ids,
 )
 
 
@@ -80,6 +81,61 @@ class TestValidateInputFile:
 
         # Should not raise
         validate_input_file(str(rfile))
+
+
+class TestNormalizeGenomeIds:
+    """Test stripping FASTA extensions from genome IDs."""
+
+    def test_strips_known_extensions(self, tmp_dir):
+        """fna/fasta/fa, with or without .gz, are stripped from column 1 only."""
+        input_file = tmp_dir / "rfile.tsv"
+        with open(input_file, 'w') as f:
+            f.write("genome1.fna\t/data/genome1.fna\n")
+            f.write("genome2.fasta.gz\t/data/genome2.fasta.gz\n")
+            f.write("genome3.fa.gz\t/data/genome3.fa.gz\n")
+            f.write("genome4\t/data/genome4.fna\n")
+
+        output_file = tmp_dir / "rfile.normalized.tsv"
+        result_path = normalize_genome_ids(str(input_file), str(output_file))
+
+        assert result_path == str(output_file)
+        lines = output_file.read_text().splitlines()
+        assert lines[0] == "genome1\t/data/genome1.fna"
+        assert lines[1] == "genome2\t/data/genome2.fasta.gz"
+        assert lines[2] == "genome3\t/data/genome3.fa.gz"
+        assert lines[3] == "genome4\t/data/genome4.fna"
+
+    def test_leaves_other_extensions_and_comments_untouched(self, tmp_dir):
+        """Unrecognised extensions, comments, and blank lines pass through unchanged."""
+        input_file = tmp_dir / "rfile.tsv"
+        with open(input_file, 'w') as f:
+            f.write("# comment line\n")
+            f.write("\n")
+            f.write("genome1.fastq.gz\t/data/genome1.fastq.gz\n")
+            f.write("genome2.FNA\t/data/genome2.FNA\n")
+
+        output_file = tmp_dir / "rfile.normalized.tsv"
+        normalize_genome_ids(str(input_file), str(output_file))
+
+        lines = output_file.read_text().splitlines()
+        assert lines[0] == "# comment line"
+        assert lines[1] == ""
+        assert lines[2] == "genome1.fastq.gz\t/data/genome1.fastq.gz"
+        assert lines[3] == "genome2.FNA\t/data/genome2.FNA"
+
+    def test_strips_completeness_file(self, tmp_dir):
+        """Works on two-column completeness files too."""
+        input_file = tmp_dir / "completeness.tsv"
+        with open(input_file, 'w') as f:
+            f.write("genome1.fna.gz\t0.95\n")
+            f.write("genome2\t1.0\n")
+
+        output_file = tmp_dir / "completeness.normalized.tsv"
+        normalize_genome_ids(str(input_file), str(output_file))
+
+        lines = output_file.read_text().splitlines()
+        assert lines[0] == "genome1\t0.95"
+        assert lines[1] == "genome2\t1.0"
 
 
 @pytest.mark.skipif(

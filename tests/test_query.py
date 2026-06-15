@@ -1,11 +1,9 @@
 """Tests for gemsparcl/query.py"""
 
-import json
 import pytest
 import pandas as pd
 
 from gemsparcl.query import (
-    load_config,
     load_cluster_assignments,
     assign_query_genomes,
     log_contamination_warnings,
@@ -14,29 +12,6 @@ from gemsparcl.query import (
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
-
-def _write_config(tmp_path, **overrides):
-    """Write a minimal valid config file and return its path."""
-    skm = tmp_path / "ref.skm"
-    skm.write_text("")
-    clusters = tmp_path / "ref_clusters.csv"
-    clusters.write_text("genome_id,cluster\nA,1\nB,1\nC,2\n")
-
-    config = {
-        "threshold": 0.98,
-        "knn": 50,
-        "sketch_size": 1000,
-        "kmer_length": 31,
-        "sketch_prefix": str(tmp_path / "ref"),
-        "clusters_file": str(clusters),
-        "completeness_file": None,
-    }
-    config.update(overrides)
-
-    cfg_path = tmp_path / "run_config.json"
-    cfg_path.write_text(json.dumps(config))
-    return str(cfg_path)
-
 
 def _write_clusters(tmp_path, rows):
     """Write a clusters CSV and return its path."""
@@ -53,50 +28,6 @@ def _write_distances(tmp_path, rows):
         for q, r, ani in rows:
             f.write(f"{q}\t{r}\t{ani}\n")
     return str(path)
-
-
-# ── TestLoadConfig ────────────────────────────────────────────────────────────
-
-class TestLoadConfig:
-    def test_load_valid_config(self, tmp_path):
-        cfg_path = _write_config(tmp_path)
-        config = load_config(cfg_path)
-        assert config["threshold"] == 0.98
-        assert config["knn"] == 50
-        assert config["sketch_size"] == 1000
-        assert config["kmer_length"] == 31
-
-    def test_load_missing_file(self, tmp_path):
-        with pytest.raises(FileNotFoundError, match="Config file not found"):
-            load_config(str(tmp_path / "nonexistent.json"))
-
-    def test_load_missing_key(self, tmp_path):
-        cfg_path = _write_config(tmp_path)
-        config = json.loads(open(cfg_path).read())
-        del config["threshold"]
-        open(cfg_path, "w").write(json.dumps(config))
-        with pytest.raises(ValueError, match="missing required keys"):
-            load_config(cfg_path)
-
-    def test_missing_clusters_file(self, tmp_path):
-        cfg_path = _write_config(tmp_path, clusters_file="/nonexistent/clusters.csv")
-        with pytest.raises(FileNotFoundError, match="Clusters file from config not found"):
-            load_config(cfg_path)
-
-    def test_missing_sketch_prefix_raises(self, tmp_path):
-        cfg_path = _write_config(tmp_path, sketch_prefix=None)
-        with pytest.raises(ValueError, match="no sketch_prefix"):
-            load_config(cfg_path)
-
-    def test_missing_skm_file_raises(self, tmp_path):
-        cfg_path = _write_config(tmp_path, sketch_prefix=str(tmp_path / "missing"))
-        with pytest.raises(FileNotFoundError, match="Sketch file not found"):
-            load_config(cfg_path)
-
-    def test_completeness_file_none_allowed(self, tmp_path):
-        cfg_path = _write_config(tmp_path, completeness_file=None)
-        config = load_config(cfg_path)
-        assert config["completeness_file"] is None
 
 
 # ── TestLoadClusterAssignments ────────────────────────────────────────────────

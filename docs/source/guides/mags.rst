@@ -3,24 +3,7 @@ Completeness Correction for MAGs
 
 Enable with ``gemsparcl cluster --completeness-file <file>``.
 
-The problem: incomplete assemblies underestimate ANI
------------------------------------------------------
-
-Metagenome-Assembled Genomes (MAGs) are frequently incomplete — a typical MAG may contain only 70–90 % of the genome's genes, depending on the sequencing depth and binning algorithm used.
-
-This incompleteness directly biases pairwise ANI estimates. If genome A has 80 % completeness, it shares at most 80 % of its k-mers with a perfect reference — even if the shared portion is 100 % identical. The sketching-based ANI estimate will therefore be systematically **lower** than the true ANI between the two organisms, pushing genome pairs below the clustering threshold and causing them to be placed in separate clusters when they should be together.
-
-
-Completeness correction
------------------------
-
-When you supply a ``--completeness-file``, gemsparcl applies a correction to the ANI estimates based on the completeness scores of both genomes in each pair.
-
-The correction adjusts for the fraction of the genome that is missing, so that a pair of 80 %-complete MAGs that share 100 % identical sequence will receive a corrected ANI close to 1.0 rather than 0.8.
-
-The correction is applied by sketchlib internally during distance computation and does not affect the sketch files themselves.
-
-Genomes not listed in the completeness file are assumed to be complete (completeness = 1.0) and receive no correction.
+Metagenome-Assembled Genomes (MAGs) are often incomplete, which can artificially lower their estimated ANI to other genomes and split a single species across multiple clusters. ``--completeness-file`` corrects for this. See :doc:`../background/completeness` for why this matters and how the correction works.
 
 
 Completeness file format
@@ -34,17 +17,17 @@ Tab-separated, one genome per line:
    another_genome<TAB>0.72
    third_genome<TAB>1.0
 
-Completeness values should be between 0 and 1. A value of 1.0 means the genome is considered complete. The ``genome_id`` must match the identifiers in your rfile (after stripping file extensions).
+Completeness values should be between 0 and 1. A value of 1.0 means the genome is considered complete. The ``genome_id`` must match the identifiers in your rfile.
+
+gemsparcl automatically strips ``.fna``, ``.fasta``, and ``.fa`` (optionally followed by ``.gz``) from genome IDs in your rfile, qfile, and completeness files before processing, so ``genome1.fna.gz`` and ``genome1`` are treated as the same genome everywhere — you don't need to match these manually.
 
 You can use tools like `CheckM <https://github.com/Ecogenomics/CheckM>`_ or `CheckM2 <https://github.com/chklovski/CheckM2>`_ to estimate genome completeness before running gemsparcl.
 
+CheckM and CheckM2 report completeness as a percentage (e.g. ``98.0``), but gemsparcl expects a fraction between 0 and 1 (e.g. ``0.98``). Convert a tab-separated ``genome_id<TAB>completeness`` file with:
 
-The completeness cutoff
------------------------
+.. code-block:: bash
 
-The ``--completeness-cutoff`` parameter (default: 0.64) sets the minimum completeness below which correction is applied. Genomes with completeness ≥ this cutoff are treated as effectively complete and are **not** corrected.
-
-The default of 0.64 reflects the practical lower bound at which completeness correction produces reliable results. Highly fragmented assemblies (< 64 % completeness) may have too little shared sequence for meaningful ANI estimation regardless of correction.
+   awk -F'\t' -v OFS='\t' '{print $1, $2/100}' checkm_completeness.tsv > completeness.tsv
 
 
 Using completeness correction with ``query``
@@ -68,4 +51,4 @@ Recommendations for MAG datasets
 1. Always run completeness estimation (CheckM/CheckM2) before clustering MAGs
 2. Use ``--completeness-file`` with completeness values for all genomes
 3. Consider using ``--refine`` to catch contaminated bins that survived binning QC
-4. If you have very incomplete genomes (< 50 %), consider filtering them out before clustering — they add noise and may not cluster reliably even with correction
+4. If you have very incomplete genomes (< 50%), consider filtering them out before clustering — they add noise and may not cluster reliably even with correction

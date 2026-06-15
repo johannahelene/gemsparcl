@@ -19,7 +19,6 @@ The command always runs these steps in order, though individual steps can be ski
 5. **Find clusters** — extract connected components from the network
 6. **Refine** *(optional)* — remove bridge nodes and edges that indicate contamination
 7. **Select representatives** *(optional)* — choose one or more representative genomes per cluster
-8. **Save config** — write ``_config.json`` for future ``query`` runs
 
 To visualise the network in Cytoscape, use :doc:`visualise` after clustering.
 
@@ -43,7 +42,7 @@ Input / Output options
 
    Output prefix used as the base name for all output files. Defaults to ``gemsparcl_out``.
 
-   Example: ``-o my_run`` produces ``my_run_clusters.csv``, ``my_run_config.json``, etc.
+   Example: ``-o my_run`` produces ``my_run_clusters.csv``, ``my_run_cluster_stats.txt``, etc.
 
 .. option:: --existing-sketch PATH
 
@@ -57,16 +56,7 @@ Input / Output options
    Skip both sketching and distance computation and use an existing ``*.dists`` file.
    This is the fastest way to experiment with different ANI thresholds.
 
-.. option:: --no-sketches
-
-   Delete the sketch files (``*.skm``, ``*.skd``) after clustering. By default they are kept.
-
-   .. warning::
-      The ``query`` command requires the sketch files from the original clustering run. Using ``--no-sketches`` will make querying impossible on this dataset.
-
-.. option:: --remove-intermediates
-
-   Delete the distance file (``*.dists``) after clustering. By default it is kept. Sketch files are not affected by this flag.
+Sketch files (``*.skm``, ``*.skd``) and the distance file (``*.dists``) are always kept alongside the cluster outputs — the sketch files are required by ``query``. Delete them yourself afterwards if you don't need them.
 
 
 Sketching options
@@ -78,7 +68,7 @@ These options control how sketchlib sketches the genomes and how many neighbours
 
    Number of hash values per sketch. Larger sketches give more accurate ANI estimates at the cost of more memory and compute time. Default: ``1000``.
 
-   **Guideline:** 1000 is appropriate for most datasets. For very divergent genomes (ANI < 85 %) or when high precision is needed, increase to 5000–10000.
+   **Guideline:** 1000 is appropriate for most datasets. For very divergent genomes (ANI < 85%) or when high precision is needed, increase to 5000–10000.
 
 .. option:: -k, --kmer-length INT
 
@@ -113,7 +103,7 @@ Clustering options
 
 .. option:: -t, --threshold FLOAT
 
-   ANI threshold for connecting genomes in the similarity network. Genome pairs with ANI ≥ this value are connected by an edge. Default: ``0.98`` (98 % ANI).
+   ANI threshold for connecting genomes in the similarity network. Genome pairs with ANI ≥ this value are connected by an edge. Default: ``0.98`` (98% ANI).
 
    - ``0.98`` — species-level clustering (standard for prokaryotes)
    - ``0.95`` — looser grouping, suitable for genus-level or divergent datasets
@@ -127,7 +117,7 @@ Completeness correction (for MAGs)
 -----------------------------------
 
 These options enable completeness correction, which adjusts ANI distances when one or both genomes are incomplete.
-See :doc:`mags` for a detailed explanation of the algorithm.
+See :doc:`mags` for file format and usage, and :doc:`../background/completeness` for why this matters and how the correction works.
 
 .. option:: --completeness-file PATH
 

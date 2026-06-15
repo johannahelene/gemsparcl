@@ -7,4 +7,6 @@ Algorithm descriptions for users who want to understand what gemsparcl does unde
    :maxdepth: 2
 
    how_it_works
+   completeness
+   plasmids
    refinement

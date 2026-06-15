@@ -9,6 +9,7 @@ from gemsparcl.clustering import (
     create_graph,
     save_clusters_csv,
     save_cluster_stats,
+    build_graph_from_distances,
 )
 
 
@@ -110,6 +111,47 @@ class TestCreateGraph:
         # Should be 1 component with all 3 genomes
         assert len(components) == 1
         assert len(components[0]) == 3
+
+
+class TestBuildGraphFromDistances:
+    """Test building a graph from one or more distance files."""
+
+    def test_single_file(self, tmp_dir):
+        dists_file = tmp_dir / "ref.dists"
+        dists_file.write_text(
+            "A\tB\t0.99\n"
+            "B\tC\t0.985\n"
+            "D\tE\t0.995\n"
+        )
+
+        graph, components = build_graph_from_distances(str(dists_file), threshold=0.98, num_processes=1)
+
+        assert graph.number_of_nodes() == 5
+        sizes = sorted(len(c) for c in components)
+        assert sizes == [2, 3]
+
+    def test_merge_multiple_files(self, tmp_dir):
+        """Reference distances and query-vs-reference distances are merged into one network."""
+        ref_file = tmp_dir / "ref.dists"
+        ref_file.write_text(
+            "A\tB\t0.99\n"
+            "C\tD\t0.99\n"
+        )
+        query_file = tmp_dir / "query.dists"
+        query_file.write_text(
+            "Q1\tB\t0.99\n"
+        )
+
+        graph, components = build_graph_from_distances(
+            [str(ref_file), str(query_file)], threshold=0.98, num_processes=1
+        )
+
+        assert graph.number_of_nodes() == 5
+        sizes = sorted(len(c) for c in components)
+        assert sizes == [2, 3]
+        # Q1 connects to B, joining the {A, B} component
+        component_with_q1 = next(c for c in components if 'Q1' in c)
+        assert component_with_q1 == {'A', 'B', 'Q1'}
 
 
 class TestSaveFunctions:

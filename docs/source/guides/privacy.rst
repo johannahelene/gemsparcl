@@ -38,7 +38,7 @@ There are two ways to cluster or assign genomes without sharing sequences:
 
    .. code-block:: bash
 
-      gemsparcl cluster -i my_genomes.txt -o my_sketch --no-sketches
+      gemsparcl cluster -i my_genomes.txt -o my_sketch
 
    Or sketch directly with sketchlib if you only want sketches without clustering:
 
@@ -100,6 +100,6 @@ The FTP will provide:
 Notes on data minimisation
 ---------------------------
 
-- ``gemsparcl query`` outputs only cluster assignments and ANI scores — not the distances file itself, which can be deleted with ``--no-sketches`` after the run
+- ``gemsparcl query`` outputs only cluster assignments and ANI scores — not the distances file itself, which you can delete after the run
 - Sketches can be deleted after querying; they are only needed at query time
 - The ``_query_results.csv`` output contains genome IDs and cluster assignments only — no sequence data

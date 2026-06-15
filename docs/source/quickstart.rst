@@ -18,6 +18,16 @@ gemsparcl reads a tab-separated genome input file listing genome identifiers and
 Each line must have exactly two tab-separated fields: a genome ID and the path to its FASTA file.
 Lines beginning with ``#`` are ignored.
 
+If you have a directory of genome assemblies, you can generate this file automatically:
+
+.. code-block:: bash
+
+   find /data/genomes/ -name "*.fna" | sort | \
+       awk -F'/' '{id=$NF; sub(/\.fna$/, "", id); print id"\t"$0}' \
+       > genomes.txt
+
+Adjust the ``-name`` pattern (and the ``sub()`` suffix) to match your file extension, e.g. ``*.fa.gz`` or ``*.fasta``.
+
 .. note::
 
    File extensions (``.fna``, ``.fasta``, ``.fa``, ``.gz``) are stripped from genome IDs in the output
@@ -41,7 +51,7 @@ This will:
 4. Find connected components — each component is a cluster
 5. Write cluster assignments to ``my_run_clusters.csv``
 
-By default, sketch files are kept (needed for ``query``) and distance files are also kept. Use ``--no-sketches`` to delete sketch files (which disables querying) or ``--remove-intermediates`` to delete the distance file.
+Sketch files (``.skm``/``.skd``) and the distance file (``.dists``) are always kept alongside the cluster outputs — the sketch files are needed for ``query``. Delete them yourself afterwards if you don't need them.
 
 
 Check the results
@@ -68,7 +78,7 @@ The clusters CSV has two columns:
 Common options
 --------------
 
-**Use a different ANI threshold** (default: 0.98 = 98 % ANI):
+**Use a different ANI threshold** (default: 0.98 = 98% ANI):
 
 .. code-block:: bash
 
@@ -112,7 +122,7 @@ Query new genomes
 -----------------
 
 After clustering, you can assign new genomes to the existing clusters without re-running the full pipeline.
-You need the sketch files from the original run (so do not use ``--no-sketches`` during clustering) and the clusters CSV.
+You need the sketch files from the original run and the clusters CSV.
 
 Pass the reference database prefix and the clusters CSV directly to ``query``:
 

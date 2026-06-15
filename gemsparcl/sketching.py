@@ -2,6 +2,7 @@
 """Sketching and distance calculation using sketchlib."""
 
 import logging
+import re
 import subprocess
 import shutil
 import os
@@ -9,6 +10,28 @@ from pathlib import Path
 from typing import Tuple, Optional
 
 logger = logging.getLogger('gemsparcl.sketching')
+
+# FASTA extensions (optionally gzipped) stripped from genome IDs so that
+# e.g. "GCA_000001405.fna.gz" and "GCA_000001405" are treated as the same genome.
+GENOME_ID_EXTENSION_RE = re.compile(r'\.(fna|fasta|fa)(?:\.gz)?$')
+
+
+def normalize_genome_ids(input_path: str, output_path: str) -> str:
+    """Strip known FASTA extensions from the genome_id column (column 1) of a
+    tab-separated rfile or completeness file, writing a normalized copy.
+
+    Comment (#) and blank lines are passed through unchanged.
+    """
+    with open(input_path) as fin, open(output_path, 'w') as fout:
+        for line in fin:
+            text = line.rstrip('\n')
+            if not text or text.startswith('#'):
+                fout.write(line)
+                continue
+            parts = text.split('\t')
+            parts[0] = GENOME_ID_EXTENSION_RE.sub('', parts[0])
+            fout.write('\t'.join(parts) + '\n')
+    return output_path
 
 
 def validate_input_file(file_path: str) -> None:
@@ -337,7 +360,6 @@ def sketch_and_compute_distances(input_file: str, output_prefix: str,
                                 existing_sketch: Optional[str] = None,
                                 completeness_file: Optional[str] = None,
                                 completeness_cutoff: float = 0.64,
-                                keep_sketches: bool = True,
                                 use_inverted_index: bool = False) -> str:
     """Main sketching pipeline."""
     logger.info("Starting sketching pipeline")
@@ -355,7 +377,6 @@ def sketch_and_compute_distances(input_file: str, output_prefix: str,
         if not Path(skd_file).exists():
             raise FileNotFoundError(f".skd file not found: {skd_file}")
 
-        keep_sketches = True  # never delete user-provided sketches
         sketch_prefix = skm_file.replace('.skm', '')
     else:
         logger.info(f"Creating sketches from: {input_file}")
@@ -384,19 +405,6 @@ def sketch_and_compute_distances(input_file: str, output_prefix: str,
             skm_file, output_prefix, sketchlib_path, kmer_length, threads, knn,
             completeness_file, completeness_cutoff
         )
-
-    if not keep_sketches:
-        logger.info("Removing sketch files")
-        files_to_remove = [skm_file, skd_file]
-        if ski_file:
-            files_to_remove.extend([ski_file, skq_file])
-
-        for file in files_to_remove:
-            if file and Path(file).exists():
-                try:
-                    os.remove(file)
-                except OSError as e:
-                    logger.warning(f"Could not remove {file}: {e}")
 
     logger.info(f"Pipeline completed: {distances_file}")
     return distances_file

@@ -22,7 +22,7 @@ Prerequisites
 
 Before running ``query`` you need:
 
-1. The sketchlib reference database files (``<refdb>.skm`` and ``<refdb>.skd``) from the original clustering run — keep these by using ``--no-sketches`` **without** the ``--no-sketches`` flag, or simply not using ``--no-sketches`` at all.
+1. The sketchlib reference database files (``<refdb>.skm`` and ``<refdb>.skd``) from the original clustering run — these are always kept by ``gemsparcl cluster``.
 2. The clusters CSV produced by that ``cluster`` run (e.g. ``bactdb_clusters.csv``).
 
 Sketch parameters (k-mer length, sketch size) are read automatically from the reference database — you do not need to specify them.
@@ -30,7 +30,7 @@ Clustering parameters (threshold, knn) default to the same values as ``cluster``
 
 .. note::
 
-   If ``gemsparcl cluster`` was run with ``--no-sketches``, the sketch files will have been deleted and querying is not possible. Re-run clustering without that flag to enable future queries.
+   If the reference sketch files have been deleted or moved since clustering, querying is not possible. Re-run ``gemsparcl cluster`` to regenerate them.
 
 
 How it works
@@ -101,22 +101,17 @@ Options
 
    Number of nearest neighbours to retain per query genome. Default: ``50``.
 
-.. option:: --completeness-file PATH
+.. option:: --ref-completeness-file PATH
 
-   Optional completeness file for MAG datasets. If the reference clustering used completeness correction, provide a file covering **both** the existing reference genomes and the new query genomes:
+   Optional tab-separated completeness file for the reference database genomes (``genome_id<TAB>completeness``, 0–1). If the reference clustering used completeness correction, provide the same file here.
 
-   .. code-block:: text
+.. option:: --query-completeness-file PATH
 
-      ref_genome1<TAB>0.95
-      new_genome1<TAB>0.72
+   Optional tab-separated completeness file for the new query genomes (``genome_id<TAB>completeness``, 0–1).
 
 .. option:: --completeness-cutoff FLOAT
 
-   Minimum completeness below which correction is applied. Default: ``0.64``.
-
-.. option:: --no-sketches
-
-   Delete query sketch files after the run to save disk space.
+   For a genome pair with completeness ``c1`` and ``c2``, correction is applied only if ``c1 * c2 >= --completeness-cutoff``; otherwise the raw ANI estimate is used. Default: ``0.64``. See :doc:`/background/completeness` for details.
 
 .. option:: --threads INT
 
@@ -166,14 +161,6 @@ Query with completeness correction (MAG datasets):
 
    gemsparcl query bactdb new_genomes.rfile \
      --clusters-file bactdb_clusters.csv \
-     --completeness-file combined_completeness.tsv \
+     --ref-completeness-file ref_completeness.tsv \
+     --query-completeness-file new_genomes_completeness.tsv \
      -o query_out
-
-Query and delete sketch files afterwards:
-
-.. code-block:: bash
-
-   gemsparcl query bactdb new_genomes.rfile \
-     --clusters-file bactdb_clusters.csv \
-     -o query_out \
-     --no-sketches

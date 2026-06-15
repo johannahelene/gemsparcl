@@ -58,29 +58,6 @@ Written only when ``--refine`` is used. Has the same format as ``_clusters.csv``
 Genomes that were identified as bridge nodes are moved to their own singleton clusters in this file.
 
 
-``<prefix>_config.json``
-^^^^^^^^^^^^^^^^^^^^^^^^^
-
-A JSON file that records all parameters used during clustering, written for reproducibility and record-keeping.
-
-.. code-block:: json
-
-   {
-     "threshold": 0.98,
-     "knn": 50,
-     "sketch_size": 1000,
-     "kmer_length": 31,
-     "sketch_prefix": "/path/to/my_run",
-     "clusters_file": "/path/to/my_run_clusters.csv",
-     "completeness_file": null
-   }
-
-.. note::
-
-   The ``query`` command reads sketch parameters directly from the reference database and does not use this file.
-   It is kept as a human-readable record of the run parameters.
-
-
 ``<prefix>_representatives.txt``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -104,12 +81,12 @@ Cytoscape visualisation files
 Written only when ``--cytoscape`` is used.
 
 ``<prefix>_part<N>.graphml``
-   The similarity network in `GraphML <http://graphml.graphdrawing.org>`_ format. Each node is a genome; edges connect genomes above the ANI threshold. Open these files directly in `Cytoscape <https://cytoscape.org>`_.
+   The similarity network in `GraphML <http://graphml.graphdrawing.org>`_ format. Each node is a genome; edges connect genomes above the ANI threshold. Node attributes (``cluster_id``, and ``is_query``/``note`` when visualising query results) are embedded directly in the file. Open these files directly in `Cytoscape <https://cytoscape.org>`_.
 
    Large networks are split into multiple files (``_part1.graphml``, ``_part2.graphml``, …), each containing at most 30 000 nodes.
 
 ``<prefix>_annotations_part<N>.csv``
-   Node metadata for the corresponding GraphML file:
+   Node metadata for the corresponding GraphML file, with the same columns as the embedded node attributes:
 
    .. code-block:: text
 
@@ -161,10 +138,10 @@ Combined results covering **all genomes** (existing reference + new queries).
 This file is useful for downstream analyses that need to see old and new genomes together in a single table.
 
 
-Intermediate files (optional)
-------------------------------
+Intermediate files
+------------------
 
-These are produced during the pipeline. Sketch files are kept by default (use ``--no-sketches`` to delete them). Distance files are also kept by default (use ``--remove-intermediates`` to delete them).
+These are produced during the pipeline and are always kept alongside the cluster outputs — the sketch files are required by ``query``. Delete them yourself afterwards if you don't need them.
 
 .. list-table::
    :header-rows: 1

@@ -97,4 +97,40 @@ class TestCLIOptions:
         result = runner.invoke(main, ['visualise', '--help'])
         assert result.exit_code == 0
         assert '--existing-distances' in result.output
+        assert '--query-distances' in result.output
         assert '--clusters-file' in result.output
+        assert '--metadata-file' in result.output
+
+    def test_visualise_with_metadata_file(self, tmp_dir):
+        """Test visualise merges --metadata-file columns into node attributes."""
+        import networkx as nx
+
+        distances_file = tmp_dir / "run.dists"
+        distances_file.write_text("A\tB\t0.99\nC\tD\t0.99\n")
+
+        clusters_file = tmp_dir / "run_clusters.csv"
+        clusters_file.write_text(
+            "genome_id,cluster\nA,1\nB,1\nC,2\nD,2\n"
+        )
+
+        metadata_file = tmp_dir / "metadata.tsv"
+        metadata_file.write_text(
+            "genome_id\tspecies\nA\tSalmonella enterica\nB\tSalmonella enterica\n"
+            "C\tKlebsiella pneumoniae\nD\tKlebsiella pneumoniae\n"
+        )
+
+        output_prefix = str(tmp_dir / "vis")
+        runner = CliRunner()
+        result = runner.invoke(main, [
+            'visualise',
+            '--existing-distances', str(distances_file),
+            '--clusters-file', str(clusters_file),
+            '--metadata-file', str(metadata_file),
+            '-o', output_prefix,
+        ])
+
+        assert result.exit_code == 0
+        graph = nx.read_graphml(f"{output_prefix}_part1.graphml")
+        assert graph.nodes['A']['species'] == 'Salmonella enterica'
+        assert graph.nodes['C']['species'] == 'Klebsiella pneumoniae'
+        assert graph.nodes['A']['cluster_id'] == 1

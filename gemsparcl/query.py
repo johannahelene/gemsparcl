@@ -1,50 +1,13 @@
 #!/usr/bin/env python3
 """Query new genomes against an existing gemsparcl clustering."""
 
-import json
 import logging
-import os
 from collections import defaultdict
 from typing import Dict, List, Set, Tuple
 
 import pandas as pd
 
 logger = logging.getLogger('gemsparcl.query')
-
-REQUIRED_CONFIG_KEYS = {'threshold', 'knn', 'sketch_size', 'kmer_length', 'clusters_file'}
-
-
-def load_config(config_file: str) -> dict:
-    """Load and validate _config.json from a previous cluster run."""
-    if not os.path.exists(config_file):
-        raise FileNotFoundError(f"Config file not found: {config_file}")
-
-    with open(config_file) as f:
-        config = json.load(f)
-
-    missing = REQUIRED_CONFIG_KEYS - set(config.keys())
-    if missing:
-        raise ValueError(f"Config missing required keys: {', '.join(sorted(missing))}")
-
-    if not os.path.exists(config['clusters_file']):
-        raise FileNotFoundError(
-            f"Clusters file from config not found: {config['clusters_file']}"
-        )
-
-    if not config.get('sketch_prefix'):
-        raise ValueError(
-            "Config has no sketch_prefix — sketch files were not kept during clustering.\n"
-            "Run gemsparcl cluster again without --no-sketches to enable querying."
-        )
-
-    skm = config['sketch_prefix'] + '.skm'
-    if not os.path.exists(skm):
-        raise FileNotFoundError(
-            f"Sketch file not found: {skm}\n"
-            "Was --no-sketches used during clustering? gemsparcl query requires sketch files."
-        )
-
-    return config
 
 
 def load_cluster_assignments(clusters_file: str) -> Tuple[Dict[str, str], Set[str]]:

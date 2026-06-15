@@ -12,6 +12,7 @@ Task-based guides for everything you can do with gemsparcl.
    privacy
    mags
    outputs
+   scaling
 
 Workflow
 --------

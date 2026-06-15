@@ -9,7 +9,7 @@ creating similarity networks, and identifying genome clusters.
 import logging
 import time
 import csv
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple, Union
 
 import pandas as pd
 import networkx as nx
@@ -17,14 +17,17 @@ from functools import partial
 from multiprocessing import Pool
 import itertools
 
+from .sketching import GENOME_ID_EXTENSION_RE
+
 logger = logging.getLogger('gemsparcl.clustering')
 
 def process_chunk(chunk: pd.DataFrame, edge_threshold: float, debug_enabled: bool = False) -> Tuple[Set[str], Dict[Tuple[str, str], float], Dict]:
     """Process a chunk of distance data and filter by threshold."""
 
-    # Strip file extensions from genome IDs for cleaner output
-    chunk['Query'] = chunk['Query'].str.replace(r'\.(fna|fasta|fa)(?:\.gz)?$', '', regex=True)
-    chunk['Reference'] = chunk['Reference'].str.replace(r'\.(fna|fasta|fa)(?:\.gz)?$', '', regex=True)
+    # Defensive: input genome IDs are normalized before sketching, but strip
+    # extensions here too in case the sketch/distance file came from raw sketchlib.
+    chunk['Query'] = chunk['Query'].str.replace(GENOME_ID_EXTENSION_RE, '', regex=True)
+    chunk['Reference'] = chunk['Reference'].str.replace(GENOME_ID_EXTENSION_RE, '', regex=True)
 
     # Extract unique genomes from all rows (before filtering)
     unique_genomes_per_chunk = set(chunk['Query']).union(set(chunk['Reference']))
@@ -144,21 +147,29 @@ def save_cluster_stats(components: List[Set], output_prefix: str) -> str:
     logger.info(f"Cluster statistics saved to {output_file}")
     return output_file
 
-def build_graph_from_distances(distance_file: str, threshold: float = 0.98,
+def build_graph_from_distances(distance_files: Union[str, List[str]], threshold: float = 0.98,
                                num_processes: int = 4,
                                chunk_size: int = 100_000) -> Tuple[nx.Graph, List[Set]]:
-    """Build similarity network from a distances file without saving any output files.
+    """Build similarity network from one or more distances files without saving any output files.
 
     Reuses process_chunk and create_graph. Use this when you need the graph object
     only (e.g. for visualisation) without re-running the full clustering pipeline.
+    Multiple distance files (e.g. reference distances plus query-vs-reference
+    distances from `gemsparcl query`) are merged into a single network.
     Returns (graph, components).
     """
+    if isinstance(distance_files, str):
+        distance_files = [distance_files]
+
     all_unique_genomes: Set[str] = set()
     all_distances: Dict[Tuple[str, str], float] = {}
 
-    chunk_iterator = pd.read_csv(
-        distance_file, sep='\t', chunksize=chunk_size,
-        names=['Query', 'Reference', 'Core'], header=None,
+    chunk_iterator = itertools.chain.from_iterable(
+        pd.read_csv(
+            distance_file, sep='\t', chunksize=chunk_size,
+            names=['Query', 'Reference', 'Core'], header=None,
+        )
+        for distance_file in distance_files
     )
 
     debug_enabled = logging.getLogger().isEnabledFor(logging.DEBUG)

@@ -9,12 +9,7 @@ The problem: contaminated genomes as bridges
 
 A contaminated genome assembly contains sequence from two or more distinct organisms. In a genome similarity network, a contaminated genome will have sequence that matches genomes in multiple distinct clusters — it acts as a *bridge* connecting clusters that should be separate.
 
-Without refinement, this bridge causes the two clusters to merge into one, inflating cluster size and reducing biological accuracy. The problem is especially common in:
-
-- Metagenome-Assembled Genomes (MAGs), where binning errors can co-assemble reads from different organisms
-- Long-read assemblies with chimeric reads
-- Old assemblies that pre-date modern quality-control standards
-
+Without refinement, this bridge causes the two clusters to merge into one.
 
 Jump-detection: the core idea
 ------------------------------

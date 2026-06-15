@@ -3,7 +3,7 @@
 
 import logging
 import csv
-from typing import List, Set, Dict
+from typing import Any, Dict, List, Set
 
 import networkx as nx
 
@@ -12,10 +12,18 @@ logger = logging.getLogger('gemsparcl.cytoscape')
 
 def export_network_for_cytoscape(graph: nx.Graph, components: List[Set[str]],
                                 output_prefix: str,
-                                cluster_assignments: Dict[str, int] = None) -> Dict[str, List[str]]:
-    """Export network to Cytoscape format, splitting large components."""
+                                node_metadata: Dict[str, Dict[str, Any]] = None) -> Dict[str, List[str]]:
+    """Export network to Cytoscape format, splitting large components.
+
+    `node_metadata` maps genome_id to a dict of arbitrary node attributes (e.g.
+    `cluster_id`, `is_query`, `note`). These are embedded directly as node
+    attributes in the GraphML output and also written to a side-car annotation CSV.
+    """
 
     logger.info(f"Exporting network ({graph.number_of_nodes()} nodes) to Cytoscape")
+
+    node_metadata = node_metadata or {}
+    annotation_columns = sorted({key for meta in node_metadata.values() for key in meta}) or ['cluster_id']
 
     # Sort components by size
     sorted_components = sorted(components, key=len, reverse=True)
@@ -37,8 +45,9 @@ def export_network_for_cytoscape(graph: nx.Graph, components: List[Set[str]],
             annotation_file = f"{output_prefix}_annotations_part{file_num}.csv"
 
             subgraph = graph.subgraph(component).copy()
+            _annotate_nodes(subgraph, node_metadata)
             nx.write_graphml(subgraph, graphml_file)
-            _save_annotations(subgraph.nodes(), annotation_file, cluster_assignments)
+            _save_annotations(subgraph.nodes(), annotation_file, node_metadata, annotation_columns)
 
             graphml_files.append(graphml_file)
             annotation_files.append(annotation_file)
@@ -57,8 +66,9 @@ def export_network_for_cytoscape(graph: nx.Graph, components: List[Set[str]],
                 annotation_file = f"{output_prefix}_annotations_part{file_num}.csv"
 
                 batch_graph = _create_batch_graph(current_batch, graph)
+                _annotate_nodes(batch_graph, node_metadata)
                 nx.write_graphml(batch_graph, graphml_file)
-                _save_annotations(batch_graph.nodes(), annotation_file, cluster_assignments)
+                _save_annotations(batch_graph.nodes(), annotation_file, node_metadata, annotation_columns)
 
                 graphml_files.append(graphml_file)
                 annotation_files.append(annotation_file)
@@ -76,8 +86,9 @@ def export_network_for_cytoscape(graph: nx.Graph, components: List[Set[str]],
             annotation_file = f"{output_prefix}_annotations_part{file_num}.csv"
 
             batch_graph = _create_batch_graph(current_batch, graph)
+            _annotate_nodes(batch_graph, node_metadata)
             nx.write_graphml(batch_graph, graphml_file)
-            _save_annotations(batch_graph.nodes(), annotation_file, cluster_assignments)
+            _save_annotations(batch_graph.nodes(), annotation_file, node_metadata, annotation_columns)
 
             graphml_files.append(graphml_file)
             annotation_files.append(annotation_file)
@@ -101,11 +112,20 @@ def _create_batch_graph(components: List[Set[str]], graph: nx.Graph) -> nx.Graph
     return batch_graph
 
 
-def _save_annotations(nodes, annotation_file: str, cluster_assignments: Dict[str, int] = None) -> None:
+def _annotate_nodes(graph: nx.Graph, node_metadata: Dict[str, Dict[str, Any]]) -> None:
+    """Copy per-node metadata onto graph nodes so it is embedded in the GraphML output."""
+    for node in graph.nodes():
+        for key, value in node_metadata.get(node, {}).items():
+            graph.nodes[node][key] = value
+
+
+def _save_annotations(nodes, annotation_file: str,
+                      node_metadata: Dict[str, Dict[str, Any]],
+                      columns: List[str]) -> None:
     """Save node annotations to CSV."""
     with open(annotation_file, 'w', newline='') as f:
         writer = csv.writer(f)
-        writer.writerow(['ID', 'cluster_id'])
+        writer.writerow(['ID'] + columns)
         for node in nodes:
-            cluster_id = cluster_assignments.get(node, 'unknown') if cluster_assignments else 'unknown'
-            writer.writerow([node, cluster_id])
+            meta = node_metadata.get(node, {})
+            writer.writerow([node] + [meta.get(column, 'unknown') for column in columns])
