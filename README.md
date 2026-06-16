@@ -2,6 +2,10 @@
 
 # gemsparcl
 
+[![CI](https://github.com/johannahelene/gemsparcl/actions/workflows/ci.yml/badge.svg)](https://github.com/johannahelene/gemsparcl/actions/workflows/ci.yml)
+[![Docs](https://github.com/johannahelene/gemsparcl/actions/workflows/docs.yml/badge.svg)](https://github.com/johannahelene/gemsparcl/actions/workflows/docs.yml)
+[![GitHub release](https://img.shields.io/github/v/release/johannahelene/gemsparcl)](https://github.com/johannahelene/gemsparcl/releases)
+
 Fast, scalable genome clustering using sketch-based ANI and network analysis.
 
 **Documentation:** https://johannahelene.github.io/gemsparcl/
